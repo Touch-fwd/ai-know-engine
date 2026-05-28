@@ -1,5 +1,6 @@
 package cn.weidong.llm.aiknowengine.entity;
 
+import cn.weidong.llm.aiknowengine.constant.DocumentStatus;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -47,7 +48,7 @@ public class KnowledgeDocument {
     @NotBlank
     @Size(max = 32)
     @TableField("status")
-    private String status;
+    private DocumentStatus status;
 
     /** 可见范围 */
     @TableField("accessible_by")

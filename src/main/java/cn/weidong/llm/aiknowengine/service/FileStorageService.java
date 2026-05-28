@@ -1,30 +1,35 @@
 package cn.weidong.llm.aiknowengine.service;
 
+import cn.weidong.llm.aiknowengine.config.MinioProperties;
 import io.minio.*;
 import io.minio.http.Method;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
 public class FileStorageService {
 
-    @Autowired
-    private MinioClient minioClient;
+    private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
-    @Value("${minio.bucketName}")
-    private String bucketName;
+    private final MinioClient minioClient;
+    private final MinioProperties properties;
 
-    @Value("${minio.endpoint}")
-    private String endpoint;
+    public FileStorageService(MinioClient minioClient, MinioProperties properties) {
+        this.minioClient = minioClient;
+        this.properties = properties;
+    }
 
     // 确保 bucket 存在
     private void createBucketIfNotExists(boolean publicRead) throws Exception {
+        String bucketName = properties.getBucketName();
         if (!minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucketName).build())) {
             minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucketName).build());
 
@@ -40,17 +45,16 @@ public class FileStorageService {
             }
         }
     }
-
     // 上传文件
     public String uploadFile(MultipartFile file, String objectName) throws Exception {
         createBucketIfNotExists(true);// 这里可根据你自己的情况改成false，如果改成false，需要在这个方法最后调一次getPresignedUrl
         minioClient.putObject(PutObjectArgs.builder()
-                .bucket(bucketName)
+                .bucket(properties.getBucketName())
                 .object(objectName)
                 .stream(file.getInputStream(), file.getSize(), -1)
-                .contentType(file.getContentType())
+                .contentType(resolveContentType(file.getContentType()))
                 .build());
-        return String.format("%s/%s/%s", endpoint, bucketName, objectName);
+        return String.format("%s/%s/%s", normalizedEndpoint(), properties.getBucketName(), objectName);
 
     }
 
@@ -62,14 +66,14 @@ public class FileStorageService {
         try (InputStream stream = new ByteArrayInputStream(content)) {
             minioClient.putObject(
                     PutObjectArgs.builder()
-                            .bucket(bucketName)
+                            .bucket(properties.getBucketName())
                             .object(objectName)
                             .stream(stream, content.length, -1)
-                            .contentType(contentType)
+                            .contentType(resolveContentType(contentType))
                             .build()
             );
 
-            return String.format("%s/%s/%s", endpoint, bucketName, objectName);
+            return String.format("%s/%s/%s", normalizedEndpoint(), properties.getBucketName(), objectName);
         }
     }
 
@@ -77,7 +81,7 @@ public class FileStorageService {
     public InputStream downloadFile(String objectName) throws Exception {
         GetObjectResponse response = minioClient.getObject(
                 GetObjectArgs.builder()
-                        .bucket(bucketName)
+                        .bucket(properties.getBucketName())
                         .object(objectName)
                         .build());
         return response;
@@ -86,7 +90,7 @@ public class FileStorageService {
     // 删除文件
     public void deleteFile(String objectName) throws Exception {
         minioClient.removeObject(RemoveObjectArgs.builder()
-                .bucket(bucketName)
+                .bucket(properties.getBucketName())
                 .object(objectName)
                 .build());
     }
@@ -96,9 +100,24 @@ public class FileStorageService {
         return minioClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                         .method(Method.GET)
-                        .bucket(bucketName)
+                        .bucket(properties.getBucketName())
                         .object(objectName)
                         .expiry(7, TimeUnit.DAYS)
                         .build());
+    }
+
+    private String resolveContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "application/octet-stream";
+        }
+        return contentType;
+    }
+
+    private String normalizedEndpoint() {
+        String endpoint = properties.endpointOrUrl();
+        if (endpoint.endsWith("/")) {
+            return endpoint.substring(0, endpoint.length() - 1);
+        }
+        return endpoint;
     }
 }
