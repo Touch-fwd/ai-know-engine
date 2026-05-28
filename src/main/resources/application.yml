@@ -23,3 +23,10 @@ mybatis-plus:
 
 server:
   port: 8010
+
+minio:
+  url: http://localhost:9000
+  accessKey: admin
+  secretKey: admin123456
+  bucketName: know-engine
+  endpoint: http://localhost:9000
