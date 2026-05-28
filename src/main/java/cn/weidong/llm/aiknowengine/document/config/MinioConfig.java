@@ -1,4 +1,4 @@
-package cn.weidong.llm.aiknowengine.config;
+package cn.weidong.llm.aiknowengine.document.config;
 
 import io.minio.MinioClient;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

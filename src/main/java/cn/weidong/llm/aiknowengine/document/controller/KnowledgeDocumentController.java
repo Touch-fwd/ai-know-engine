@@ -1,9 +1,9 @@
-package cn.weidong.llm.aiknowengine.controller;
+package cn.weidong.llm.aiknowengine.document.controller;
 
-import cn.weidong.llm.aiknowengine.constant.DocumentStatus;
-import cn.weidong.llm.aiknowengine.entity.KnowledgeDocument;
-import cn.weidong.llm.aiknowengine.service.FileStorageService;
-import cn.weidong.llm.aiknowengine.service.KnowledgeDocumentService;
+import cn.weidong.llm.aiknowengine.document.constant.DocumentStatus;
+import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
+import cn.weidong.llm.aiknowengine.document.service.FileStorageService;
+import cn.weidong.llm.aiknowengine.document.service.KnowledgeDocumentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;

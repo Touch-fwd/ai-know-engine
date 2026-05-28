@@ -1,6 +1,6 @@
-package cn.weidong.llm.aiknowengine.entity;
+package cn.weidong.llm.aiknowengine.document.entity;
 
-import cn.weidong.llm.aiknowengine.constant.DocumentStatus;
+import cn.weidong.llm.aiknowengine.document.constant.DocumentStatus;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;

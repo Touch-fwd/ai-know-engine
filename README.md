@@ -8,6 +8,12 @@ Spring Boot 3.5.8 + MyBatis-Plus knowledge engine service.
 mvn spring-boot:run
 ```
 
+Document upload page:
+
+```text
+http://localhost:8010/upload.html
+```
+
 The service connects to:
 
 ```text

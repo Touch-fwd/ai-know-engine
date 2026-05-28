@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>文档上传</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f6f7f9;
+            --panel: #ffffff;
+            --panel-soft: #f1f5f2;
+            --text: #17201b;
+            --muted: #65716b;
+            --line: #dce3df;
+            --accent: #28795b;
+            --accent-strong: #1e5f48;
+            --warn: #9a4d18;
+            --danger: #b3261e;
+            --ok: #1f7a4a;
+            --shadow: 0 18px 45px rgba(22, 34, 28, 0.10);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        .app {
+            width: min(1120px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 32px 0;
+        }
+
+        header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 8px 0 24px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.2;
+            font-weight: 720;
+        }
+
+        .endpoint {
+            color: var(--muted);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 380px;
+            gap: 24px;
+            padding-top: 24px;
+            align-items: start;
+        }
+
+        .upload-panel,
+        .result-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .upload-panel {
+            padding: 24px;
+        }
+
+        .drop-zone {
+            min-height: 260px;
+            border: 1px dashed #9ab6a9;
+            border-radius: 8px;
+            background: var(--panel-soft);
+            display: grid;
+            place-items: center;
+            padding: 28px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.is-dragging {
+            border-color: var(--accent);
+            background: #e8f1ec;
+            transform: translateY(-1px);
+        }
+
+        .file-symbol {
+            width: 56px;
+            height: 70px;
+            margin: 0 auto 18px;
+            border: 2px solid var(--accent);
+            border-radius: 6px;
+            position: relative;
+            background: #fff;
+        }
+
+        .file-symbol::after {
+            content: "";
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 18px;
+            height: 18px;
+            border-left: 2px solid var(--accent);
+            border-bottom: 2px solid var(--accent);
+            background: var(--panel-soft);
+            border-bottom-left-radius: 4px;
+        }
+
+        .drop-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 680;
+        }
+
+        .drop-subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .selected-file {
+            display: none;
+            margin-top: 16px;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--text);
+            min-height: 48px;
+        }
+
+        .selected-file.is-visible {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .file-name {
+            min-width: 0;
+            overflow-wrap: anywhere;
+            font-weight: 650;
+        }
+
+        .file-size {
+            color: var(--muted);
+            white-space: nowrap;
+            font-size: 13px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        label {
+            display: grid;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        input[type="text"] {
+            width: 100%;
+            height: 42px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 12px;
+            font: inherit;
+            color: var(--text);
+            background: #fff;
+        }
+
+        input[type="text"]:focus {
+            outline: 2px solid rgba(40, 121, 91, 0.20);
+            border-color: var(--accent);
+        }
+
+        input[type="file"] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        button {
+            min-width: 108px;
+            height: 42px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 0 16px;
+            font: inherit;
+            font-weight: 650;
+            cursor: pointer;
+        }
+
+        .secondary {
+            background: #fff;
+            border-color: var(--line);
+            color: var(--text);
+        }
+
+        .primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .primary:hover {
+            background: var(--accent-strong);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .result-panel {
+            overflow: hidden;
+        }
+
+        .result-header {
+            padding: 18px 18px 14px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .result-header h2 {
+            margin: 0;
+            font-size: 17px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #eef2ef;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .status-pill.ok {
+            background: #e6f3eb;
+            color: var(--ok);
+        }
+
+        .status-pill.error {
+            background: #fbe9e7;
+            color: var(--danger);
+        }
+
+        .result-body {
+            padding: 18px;
+        }
+
+        .empty-state {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .message {
+            display: none;
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message.is-visible {
+            display: block;
+        }
+
+        .message.error {
+            background: #fbe9e7;
+            color: var(--danger);
+            border: 1px solid #f3c4bd;
+        }
+
+        .message.warn {
+            background: #fff3e5;
+            color: var(--warn);
+            border: 1px solid #f0cfaa;
+        }
+
+        dl {
+            margin: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        .field {
+            display: grid;
+            gap: 4px;
+        }
+
+        dt {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        dd {
+            margin: 0;
+            color: var(--text);
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        dd code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 13px;
+        }
+
+        @media (max-width: 860px) {
+            .app {
+                width: min(100% - 24px, 640px);
+                padding: 20px 0;
+            }
+
+            header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .endpoint {
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+
+            main {
+                grid-template-columns: 1fr;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <header>
+        <h1>知识文档上传</h1>
+        <div class="endpoint">POST /api/knowledge-documents/upload</div>
+    </header>
+
+    <main>
+        <section class="upload-panel" aria-label="上传表单">
+            <form id="uploadForm">
+                <input id="fileInput" name="file" type="file" required>
+                <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-controls="fileInput">
+                    <div>
+                        <div class="file-symbol" aria-hidden="true"></div>
+                        <p class="drop-title">选择或拖放文档</p>
+                        <p class="drop-subtitle">文件会上传到 MinIO，并保存文档记录</p>
+                    </div>
+                </div>
+
+                <div id="selectedFile" class="selected-file" aria-live="polite">
+                    <span id="fileName" class="file-name"></span>
+                    <span id="fileSize" class="file-size"></span>
+                </div>
+
+                <div class="form-grid">
+                    <label>
+                        上传用户
+                        <input id="uploadUser" name="uploadUser" type="text" maxlength="255" autocomplete="off">
+                    </label>
+                    <label>
+                        可见范围
+                        <input id="accessibleBy" name="accessibleBy" type="text" maxlength="1024" autocomplete="off">
+                    </label>
+                </div>
+
+                <div id="message" class="message" role="alert"></div>
+
+                <div class="actions">
+                    <button id="resetButton" class="secondary" type="button">清空</button>
+                    <button id="submitButton" class="primary" type="submit">上传文档</button>
+                </div>
+            </form>
+        </section>
+
+        <aside class="result-panel" aria-label="上传结果">
+            <div class="result-header">
+                <h2>上传结果</h2>
+                <span id="statusPill" class="status-pill">等待上传</span>
+            </div>
+            <div class="result-body">
+                <div id="emptyState" class="empty-state">上传成功后会显示文档 ID、标题、地址、上传用户和状态。</div>
+                <dl id="resultDetails" hidden>
+                    <div class="field">
+                        <dt>文档 ID</dt>
+                        <dd id="docId"></dd>
+                    </div>
+                    <div class="field">
+                        <dt>文档标题</dt>
+                        <dd id="docTitle"></dd>
+                    </div>
+                    <div class="field">
+                        <dt>文档地址</dt>
+                        <dd id="docUrl"></dd>
+                    </div>
+                    <div class="field">
+                        <dt>上传用户</dt>
+                        <dd id="resultUploadUser"></dd>
+                    </div>
+                    <div class="field">
+                        <dt>可见范围</dt>
+                        <dd id="resultAccessibleBy"></dd>
+                    </div>
+                    <div class="field">
+                        <dt>状态</dt>
+                        <dd id="resultStatus"></dd>
+                    </div>
+                </dl>
+            </div>
+        </aside>
+    </main>
+</div>
+
+<script>
+    const uploadForm = document.getElementById("uploadForm");
+    const fileInput = document.getElementById("fileInput");
+    const dropZone = document.getElementById("dropZone");
+    const selectedFile = document.getElementById("selectedFile");
+    const fileName = document.getElementById("fileName");
+    const fileSize = document.getElementById("fileSize");
+    const uploadUser = document.getElementById("uploadUser");
+    const accessibleBy = document.getElementById("accessibleBy");
+    const message = document.getElementById("message");
+    const submitButton = document.getElementById("submitButton");
+    const resetButton = document.getElementById("resetButton");
+    const statusPill = document.getElementById("statusPill");
+    const emptyState = document.getElementById("emptyState");
+    const resultDetails = document.getElementById("resultDetails");
+
+    dropZone.addEventListener("click", () => fileInput.click());
+    dropZone.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            fileInput.click();
+        }
+    });
+
+    dropZone.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        dropZone.classList.add("is-dragging");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("is-dragging");
+    });
+
+    dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("is-dragging");
+        const file = event.dataTransfer.files[0];
+        if (!file) {
+            return;
+        }
+        fileInput.files = event.dataTransfer.files;
+        renderSelectedFile(file);
+        clearMessage();
+    });
+
+    fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        if (file) {
+            renderSelectedFile(file);
+            clearMessage();
+        }
+    });
+
+    resetButton.addEventListener("click", () => {
+        uploadForm.reset();
+        selectedFile.classList.remove("is-visible");
+        fileName.textContent = "";
+        fileSize.textContent = "";
+        setStatus("等待上传");
+        resultDetails.hidden = true;
+        emptyState.hidden = false;
+        clearMessage();
+    });
+
+    uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const file = fileInput.files[0];
+        if (!file) {
+            showMessage("请选择要上传的文档。", "warn");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("uploadUser", uploadUser.value.trim());
+        formData.append("accessibleBy", accessibleBy.value.trim());
+
+        submitButton.disabled = true;
+        resetButton.disabled = true;
+        setStatus("上传中");
+        clearMessage();
+
+        try {
+            const response = await fetch("/api/knowledge-documents/upload", {
+                method: "POST",
+                body: formData
+            });
+            const responseText = await response.text();
+            const payload = responseText ? JSON.parse(responseText) : {};
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || "上传失败");
+            }
+            renderResult(payload);
+            setStatus("上传成功", "ok");
+        } catch (error) {
+            setStatus("上传失败", "error");
+            showMessage(error.message || "上传失败，请检查服务端日志。", "error");
+        } finally {
+            submitButton.disabled = false;
+            resetButton.disabled = false;
+        }
+    });
+
+    function renderSelectedFile(file) {
+        fileName.textContent = file.name;
+        fileSize.textContent = formatBytes(file.size);
+        selectedFile.classList.add("is-visible");
+    }
+
+    function renderResult(uploadedDocument) {
+        emptyState.hidden = true;
+        resultDetails.hidden = false;
+        setText("docId", uploadedDocument.docId);
+        setText("docTitle", uploadedDocument.docTitle);
+        setText("docUrl", uploadedDocument.docUrl);
+        setText("resultUploadUser", uploadedDocument.uploadUser);
+        setText("resultAccessibleBy", uploadedDocument.accessibleBy);
+        setText("resultStatus", uploadedDocument.status);
+    }
+
+    function setText(id, value) {
+        const element = window.document.getElementById(id);
+        if (id === "docUrl" && value) {
+            element.innerHTML = "";
+            const link = window.document.createElement("a");
+            link.href = value;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = value;
+            element.appendChild(link);
+            return;
+        }
+        element.textContent = value || "-";
+    }
+
+    function setStatus(text, type) {
+        statusPill.textContent = text;
+        statusPill.className = "status-pill";
+        if (type) {
+            statusPill.classList.add(type);
+        }
+    }
+
+    function showMessage(text, type) {
+        message.textContent = text;
+        message.className = `message ${type} is-visible`;
+    }
+
+    function clearMessage() {
+        message.textContent = "";
+        message.className = "message";
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) {
+            return "0 B";
+        }
+        const units = ["B", "KB", "MB", "GB"];
+        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / Math.pow(1024, index);
+        return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-package cn.weidong.llm.aiknowengine.constant;
+package cn.weidong.llm.aiknowengine.document.constant;
 
 public enum SegmentStatus {
 

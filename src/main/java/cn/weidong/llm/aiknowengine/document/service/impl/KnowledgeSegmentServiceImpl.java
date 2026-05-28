@@ -1,8 +1,8 @@
-package cn.weidong.llm.aiknowengine.service.impl;
+package cn.weidong.llm.aiknowengine.document.service.impl;
 
-import cn.weidong.llm.aiknowengine.entity.KnowledgeSegment;
-import cn.weidong.llm.aiknowengine.mapper.KnowledgeSegmentMapper;
-import cn.weidong.llm.aiknowengine.service.KnowledgeSegmentService;
+import cn.weidong.llm.aiknowengine.document.entity.KnowledgeSegment;
+import cn.weidong.llm.aiknowengine.document.mapper.KnowledgeSegmentMapper;
+import cn.weidong.llm.aiknowengine.document.service.KnowledgeSegmentService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 

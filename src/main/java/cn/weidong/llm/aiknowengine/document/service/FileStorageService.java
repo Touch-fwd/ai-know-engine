@@ -1,17 +1,14 @@
-package cn.weidong.llm.aiknowengine.service;
+package cn.weidong.llm.aiknowengine.document.service;
 
-import cn.weidong.llm.aiknowengine.config.MinioProperties;
+import cn.weidong.llm.aiknowengine.document.config.MinioProperties;
 import io.minio.*;
 import io.minio.http.Method;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service

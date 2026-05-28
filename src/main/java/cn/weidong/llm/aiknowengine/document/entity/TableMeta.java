@@ -1,4 +1,4 @@
-package cn.weidong.llm.aiknowengine.entity;
+package cn.weidong.llm.aiknowengine.document.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;

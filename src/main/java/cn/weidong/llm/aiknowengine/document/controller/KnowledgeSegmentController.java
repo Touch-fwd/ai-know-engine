@@ -1,8 +1,8 @@
-package cn.weidong.llm.aiknowengine.controller;
+package cn.weidong.llm.aiknowengine.document.controller;
 
 import cn.weidong.llm.aiknowengine.common.PageResponse;
-import cn.weidong.llm.aiknowengine.entity.KnowledgeSegment;
-import cn.weidong.llm.aiknowengine.service.KnowledgeSegmentService;
+import cn.weidong.llm.aiknowengine.document.entity.KnowledgeSegment;
+import cn.weidong.llm.aiknowengine.document.service.KnowledgeSegmentService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.validation.Valid;
