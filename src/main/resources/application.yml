@@ -30,3 +30,11 @@ minio:
   secretKey: admin123456
   bucketName: know-engine
   endpoint: http://localhost:9000
+
+mineru:
+  baseUrl: https://mineru.net
+  token: ${MINERU_API_TOKEN:}
+  modelVersion: vlm
+  ocrEnabled: true
+  pollIntervalSeconds: 5
+  maxPollTimes: 120
