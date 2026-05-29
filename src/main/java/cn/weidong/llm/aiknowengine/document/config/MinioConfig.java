@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties({MinioProperties.class, MinerUProperties.class})
+@EnableConfigurationProperties({MinioProperties.class, MinerUProperties.class, VisionModelProperties.class})
 public class MinioConfig {
 
     @Bean

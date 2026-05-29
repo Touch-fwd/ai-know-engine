@@ -19,6 +19,7 @@ public final class FileTypeUtil {
     private static final Logger log = LoggerFactory.getLogger(FileTypeUtil.class);
     private static final Tika TIKA = new Tika();
 
+    /** 后缀名到业务文件类型的映射。 */
     private static final Map<String, FileType> EXTENSION_TYPE_MAPPING = Map.ofEntries(
             Map.entry("pdf", FileType.PDF),
             Map.entry("doc", FileType.DOC),
@@ -33,6 +34,7 @@ public final class FileTypeUtil {
             Map.entry("xlsx", FileType.EXCEL)
     );
 
+    /** Tika 识别出的 MIME 类型到业务文件类型的映射。 */
     private static final Map<String, FileType> MEDIA_TYPE_MAPPING = Map.ofEntries(
             Map.entry("application/pdf", FileType.PDF),
             Map.entry("application/msword", FileType.DOC),

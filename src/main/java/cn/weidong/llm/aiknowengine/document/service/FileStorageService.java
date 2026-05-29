@@ -27,7 +27,13 @@ public class FileStorageService {
         this.properties = properties;
     }
 
-    // 确保 bucket 存在
+    /**
+     * 确保 MinIO bucket 存在。
+     * <p>
+     * 当前业务上传后的文件需要能够直接通过 URL 访问，因此 bucket 首次创建时会按需设置公共读策略。
+     *
+     * @param publicRead 是否设置公共读
+     */
     private void createBucketIfNotExists(boolean publicRead) throws Exception {
         String bucketName = properties.getBucketName();
         log.debug("Checking MinIO bucket, bucketName={}, publicRead={}", bucketName, publicRead);
@@ -50,7 +56,14 @@ public class FileStorageService {
             log.debug("MinIO bucket already exists, bucketName={}", bucketName);
         }
     }
-    // 上传文件
+
+    /**
+     * 上传 Multipart 文件到 MinIO。
+     *
+     * @param file 上传文件
+     * @param objectName MinIO 对象名
+     * @return 文件访问 URL
+     */
     public String uploadFile(MultipartFile file, String objectName) throws Exception {
         long startTime = System.currentTimeMillis();
         log.info("Start uploading multipart file to MinIO, bucketName={}, objectName={}, originalFilename={}, size={}",
@@ -70,7 +83,12 @@ public class FileStorageService {
     }
 
     /**
-     * 上传文件
+     * 上传字节数组到 MinIO，适用于 MinerU 生成的 md、图片、zip 等内存数据。
+     *
+     * @param objectName MinIO 对象名
+     * @param content 文件内容
+     * @param contentType 文件 MIME 类型
+     * @return 文件访问 URL
      */
     public String uploadFile(String objectName, byte[] content, String contentType) throws Exception {
         long startTime = System.currentTimeMillis();
@@ -94,7 +112,12 @@ public class FileStorageService {
         }
     }
 
-    // 下载文件（返回 InputStream）
+    /**
+     * 从 MinIO 下载文件，调用方负责关闭返回的 InputStream。
+     *
+     * @param objectName MinIO 对象名
+     * @return 文件输入流
+     */
     public InputStream downloadFile(String objectName) throws Exception {
         log.info("Start downloading file from MinIO, bucketName={}, objectName={}", properties.getBucketName(), objectName);
         GetObjectResponse response = minioClient.getObject(
@@ -106,7 +129,11 @@ public class FileStorageService {
         return response;
     }
 
-    // 删除文件
+    /**
+     * 删除 MinIO 中的文件。
+     *
+     * @param objectName MinIO 对象名
+     */
     public void deleteFile(String objectName) throws Exception {
         log.info("Deleting file from MinIO, bucketName={}, objectName={}", properties.getBucketName(), objectName);
         minioClient.removeObject(RemoveObjectArgs.builder()
@@ -116,7 +143,12 @@ public class FileStorageService {
         log.info("File deleted from MinIO, bucketName={}, objectName={}", properties.getBucketName(), objectName);
     }
 
-    // 生成临时下载链接（带签名，有效期 7 天）
+    /**
+     * 生成临时下载链接，默认有效期 7 天。
+     *
+     * @param objectName MinIO 对象名
+     * @return 临时签名 URL
+     */
     public String getPresignedUrl(String objectName) throws Exception {
         log.info("Generating MinIO presigned URL, bucketName={}, objectName={}, expiryDays=7",
                 properties.getBucketName(), objectName);

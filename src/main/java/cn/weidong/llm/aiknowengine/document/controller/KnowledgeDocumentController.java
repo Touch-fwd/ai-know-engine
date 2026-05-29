@@ -36,6 +36,17 @@ public class KnowledgeDocumentController {
         this.minerUProcessBaseService = minerUProcessBaseService;
     }
 
+    /**
+     * 上传知识文档。
+     * <p>
+     * 文件会先保存到 MinIO 并落库为 UPLOADED 状态；如果识别为 PDF，则立即触发 MinerU 解析，
+     * 解析完成后返回带有 convertedDocUrl 的文档信息。
+     *
+     * @param file 上传文件
+     * @param uploadUser 上传用户
+     * @param accessibleBy 可见范围
+     * @return 文档记录
+     */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public KnowledgeDocument upload(@RequestParam MultipartFile file,
                                     @RequestParam(required = false) String uploadUser,
@@ -57,6 +68,7 @@ public class KnowledgeDocumentController {
             knowledgeDocumentService.save(document);
             log.info("Knowledge document saved, docId={}, status={}", document.getDocId(), document.getStatus());
 
+            // PDF 文档需要继续走 MinerU 解析链路，非 PDF 文件只保存原始上传记录。
             boolean pdf = FileTypeUtil.isFileType(originalFilename, file, FileType.PDF);
             log.info("Knowledge document file type checked, docId={}, fileName={}, isPdf={}",
                     document.getDocId(), originalFilename, pdf);
