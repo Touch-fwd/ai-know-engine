@@ -1,9 +1,12 @@
 package cn.weidong.llm.aiknowengine.document.controller;
 
 import cn.weidong.llm.aiknowengine.document.constant.DocumentStatus;
+import cn.weidong.llm.aiknowengine.document.constant.FileType;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import cn.weidong.llm.aiknowengine.document.service.FileStorageService;
 import cn.weidong.llm.aiknowengine.document.service.KnowledgeDocumentService;
+import cn.weidong.llm.aiknowengine.document.service.MinerUProcessBaseService;
+import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,11 +22,14 @@ public class KnowledgeDocumentController {
 
     private final KnowledgeDocumentService knowledgeDocumentService;
     private final FileStorageService fileStorageService;
+    private final MinerUProcessBaseService minerUProcessBaseService;
 
     public KnowledgeDocumentController(KnowledgeDocumentService knowledgeDocumentService,
-                                       FileStorageService fileStorageService) {
+                                       FileStorageService fileStorageService,
+                                       MinerUProcessBaseService minerUProcessBaseService) {
         this.knowledgeDocumentService = knowledgeDocumentService;
         this.fileStorageService = fileStorageService;
+        this.minerUProcessBaseService = minerUProcessBaseService;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -39,6 +45,9 @@ public class KnowledgeDocumentController {
             document.setDocUrl(fileUrl);
             document.setStatus(DocumentStatus.UPLOADED);
             knowledgeDocumentService.save(document);
+            if (FileTypeUtil.isFileType(file.getOriginalFilename(), file, FileType.PDF)) {
+                return minerUProcessBaseService.process(document, file.getInputStream());
+            }
             return document;
         } catch (Exception ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
