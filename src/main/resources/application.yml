@@ -24,6 +24,10 @@ mybatis-plus:
 server:
   port: 8010
 
+logging:
+  level:
+    cn.weidong.llm.aiknowengine: info
+
 minio:
   url: http://localhost:9000
   accessKey: admin

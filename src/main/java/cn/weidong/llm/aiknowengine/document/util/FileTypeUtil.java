@@ -2,6 +2,8 @@ package cn.weidong.llm.aiknowengine.document.util;
 
 import cn.weidong.llm.aiknowengine.document.constant.FileType;
 import org.apache.tika.Tika;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,6 +16,7 @@ import java.util.Map;
  */
 public final class FileTypeUtil {
 
+    private static final Logger log = LoggerFactory.getLogger(FileTypeUtil.class);
     private static final Tika TIKA = new Tika();
 
     private static final Map<String, FileType> EXTENSION_TYPE_MAPPING = Map.ofEntries(
@@ -56,9 +59,12 @@ public final class FileTypeUtil {
     public static FileType getFileType(String fileName, MultipartFile file) {
         FileType fileType = getFileTypeByFileName(resolveFileName(fileName, file));
         if (fileType != null) {
+            log.debug("File type detected by extension, fileName={}, fileType={}", fileName, fileType);
             return fileType;
         }
-        return getFileTypeByContent(file);
+        FileType contentFileType = getFileTypeByContent(file);
+        log.debug("File type detected by content, fileName={}, fileType={}", fileName, contentFileType);
+        return contentFileType;
     }
 
     /**
@@ -69,7 +75,12 @@ public final class FileTypeUtil {
      * @return 是否支持
      */
     public static boolean isSupportedFileType(String fileName, MultipartFile file) {
-        return getFileTypeByFileName(resolveFileName(fileName, file)) != null || getFileTypeByContent(file) != null;
+        FileType extensionType = getFileTypeByFileName(resolveFileName(fileName, file));
+        FileType contentType = getFileTypeByContent(file);
+        boolean supported = extensionType != null || contentType != null;
+        log.info("Supported file type checked, fileName={}, extensionType={}, contentType={}, supported={}",
+                fileName, extensionType, contentType, supported);
+        return supported;
     }
 
     /**
@@ -84,8 +95,12 @@ public final class FileTypeUtil {
         if (expectedType == null) {
             return false;
         }
-        return expectedType == getFileTypeByFileName(resolveFileName(fileName, file))
-                || expectedType == getFileTypeByContent(file);
+        FileType extensionType = getFileTypeByFileName(resolveFileName(fileName, file));
+        FileType contentType = getFileTypeByContent(file);
+        boolean matched = expectedType == extensionType || expectedType == contentType;
+        log.info("Expected file type checked, fileName={}, expectedType={}, extensionType={}, contentType={}, matched={}",
+                fileName, expectedType, extensionType, contentType, matched);
+        return matched;
     }
 
     private static String resolveFileName(String fileName, MultipartFile file) {
@@ -116,10 +131,15 @@ public final class FileTypeUtil {
         try {
             String mediaType = TIKA.detect(file.getInputStream(), file.getOriginalFilename());
             if (!StringUtils.hasText(mediaType)) {
+                log.debug("Tika returned empty media type, originalFilename={}", file.getOriginalFilename());
                 return null;
             }
-            return MEDIA_TYPE_MAPPING.get(mediaType.toLowerCase(Locale.ROOT));
+            FileType fileType = MEDIA_TYPE_MAPPING.get(mediaType.toLowerCase(Locale.ROOT));
+            log.debug("Tika media type detected, originalFilename={}, mediaType={}, fileType={}",
+                    file.getOriginalFilename(), mediaType, fileType);
+            return fileType;
         } catch (IOException ex) {
+            log.warn("Failed to detect file type by content, originalFilename={}", file.getOriginalFilename(), ex);
             return null;
         }
     }
