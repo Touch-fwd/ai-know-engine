@@ -54,18 +54,17 @@ public final class FileTypeUtil {
     /**
      * 根据文件名和上传文件信息识别文件类型，无法识别时返回 null。
      *
-     * @param fileName 文件名
      * @param file 上传文件
      * @return 文件类型
      */
-    public static FileType getFileType(String fileName, MultipartFile file) {
-        FileType fileType = getFileTypeByFileName(resolveFileName(fileName, file));
+    public static FileType getFileType(MultipartFile file) {
+        FileType fileType = getFileTypeByFileName(file.getOriginalFilename());
         if (fileType != null) {
-            log.debug("File type detected by extension, fileName={}, fileType={}", fileName, fileType);
+            log.debug("File type detected by extension, fileName={}, fileType={}", file.getOriginalFilename(), fileType);
             return fileType;
         }
         FileType contentFileType = getFileTypeByContent(file);
-        log.debug("File type detected by content, fileName={}, fileType={}", fileName, contentFileType);
+        log.debug("File type detected by content, fileName={}, fileType={}", file.getOriginalFilename(), contentFileType);
         return contentFileType;
     }
 
