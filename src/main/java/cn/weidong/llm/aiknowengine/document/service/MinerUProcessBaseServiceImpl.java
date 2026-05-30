@@ -93,16 +93,10 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
         updateStatus(document, DocumentStatus.CONVERTING);
 
         try {
-            // MinerU 采用“先申请签名 URL，再 PUT 上传文件，再轮询结果”的异步解析模式。
-            MinerUBatchUpload batchUpload = createBatchUpload(document);
-            log.info("MinerU batch upload created, docId={}, batchId={}", document.getDocId(), batchUpload.batchId());
-            uploadPdfToMinerU(batchUpload.uploadUrl(), inputStream);
-            log.info("PDF uploaded to MinerU, docId={}, batchId={}", document.getDocId(), batchUpload.batchId());
-            String fullZipUrl = waitForFullZipUrl(batchUpload.batchId());
-            log.info("MinerU parsing result is ready, docId={}, batchId={}", document.getDocId(), batchUpload.batchId());
-            byte[] zipBytes = downloadZip(fullZipUrl);
-            log.info("MinerU zip downloaded, docId={}, batchId={}, zipSize={}",
-                    document.getDocId(), batchUpload.batchId(), zipBytes.length);
+            // 统一入口：内部仍然走 MinerU 公共 API 的异步流程，返回值统一为 ZIP 字节数组。
+            byte[] zipBytes = parseDocumentToZip(resolvePdfFileName(document), inputStream);
+            log.info("MinerU zip parsed by public API, docId={}, zipSize={}",
+                    document.getDocId(), zipBytes.length);
             // MinerU 原始结果是 zip，本地解压后需要进一步处理图片和 Markdown，再上传最终 md。
             String convertedDocUrl = processMinerUZip(document, zipBytes);
             log.info("MinerU markdown processed and uploaded to MinIO, docId={}, convertedDocUrl={}",
@@ -144,6 +138,50 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
         }
     }
 
+    /**
+     * 调用 MinerU 公共 API，获取 ZIP 格式解析结果。
+     * <p>
+     * 对外表现为一个统一方法，内部仍使用公共 API 的异步链路：
+     * 1. 创建 batch 并获取签名上传 URL；
+     * 2. PUT 上传文件；
+     * 3. 轮询解析结果；
+     * 4. 下载 full_zip_url。
+     *
+     * @param fileName 文件名
+     * @param fileStream 文件输入流
+     * @return ZIP 文件字节数组
+     */
+    private byte[] parseDocumentToZip(String fileName, InputStream fileStream) throws IOException, InterruptedException {
+        try {
+            MinerUBatchUpload batchUpload = createBatchUpload(fileName);
+            log.info("MinerU batch upload created, fileName={}, batchId={}", fileName, batchUpload.batchId());
+            uploadPdfToMinerU(batchUpload.uploadUrl(), fileStream);
+            log.info("File uploaded to MinerU, fileName={}, batchId={}", fileName, batchUpload.batchId());
+            String fullZipUrl = waitForFullZipUrl(batchUpload.batchId());
+            log.info("MinerU parsing result is ready, fileName={}, batchId={}", fileName, batchUpload.batchId());
+            byte[] zipBytes = downloadZip(fullZipUrl);
+            log.info("MinerU zip downloaded, fileName={}, batchId={}, zipSize={}",
+                    fileName, batchUpload.batchId(), zipBytes.length);
+            return zipBytes;
+        } catch (Exception ex) {
+            log.error("调用 MinerU 公共 API 解析文件异常, fileName={}", fileName, ex);
+            throw ex;
+        } finally {
+            closeQuietly(fileStream);
+        }
+    }
+
+    private void closeQuietly(InputStream inputStream) {
+        if (inputStream == null) {
+            return;
+        }
+        try {
+            inputStream.close();
+        } catch (IOException ex) {
+            log.warn("关闭文件输入流失败", ex);
+        }
+    }
+
     private void updateStatus(KnowledgeDocument document, DocumentStatus status) {
         KnowledgeDocument updateDocument = new KnowledgeDocument();
         updateDocument.setDocId(document.getDocId());
@@ -153,11 +191,10 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
         log.info("Knowledge document status updated, docId={}, status={}", document.getDocId(), status);
     }
 
-    private MinerUBatchUpload createBatchUpload(KnowledgeDocument document) throws IOException, InterruptedException {
+    private MinerUBatchUpload createBatchUpload(String fileName) throws IOException, InterruptedException {
         long startTime = System.currentTimeMillis();
-        String fileName = resolvePdfFileName(document);
-        log.info("Creating MinerU batch upload, docId={}, fileName={}, modelVersion={}, ocrEnabled={}",
-                document.getDocId(), fileName, minerUProperties.getModelVersion(), minerUProperties.isOcrEnabled());
+        log.info("Creating MinerU batch upload, fileName={}, modelVersion={}, ocrEnabled={}",
+                fileName, minerUProperties.getModelVersion(), minerUProperties.isOcrEnabled());
         // is_ocr 放在文件维度，方便后续同一 batch 支持不同文件使用不同解析策略。
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("enable_formula", true);
@@ -166,7 +203,7 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
         requestBody.put("files", List.of(Map.of(
                 "name", fileName,
                 "is_ocr", minerUProperties.isOcrEnabled(),
-                "data_id", "doc_" + document.getDocId()
+                "data_id", UUID.randomUUID().toString()
         )));
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -183,8 +220,8 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
         if (!StringUtils.hasText(batchId) || !fileUrls.isArray() || fileUrls.isEmpty()) {
             throw new IllegalStateException("MinerU batch upload response missing batch_id or file_urls");
         }
-        log.info("MinerU batch upload response received, docId={}, batchId={}, elapsedMs={}",
-                document.getDocId(), batchId, System.currentTimeMillis() - startTime);
+        log.info("MinerU batch upload response received, fileName={}, batchId={}, elapsedMs={}",
+                fileName, batchId, System.currentTimeMillis() - startTime);
         return new MinerUBatchUpload(batchId, fileUrls.get(0).asText());
     }
 
