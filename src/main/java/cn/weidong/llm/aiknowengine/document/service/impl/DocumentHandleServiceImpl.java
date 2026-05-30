@@ -11,11 +11,17 @@ import cn.weidong.llm.aiknowengine.document.service.*;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
 import cn.weidong.llm.aiknowengine.rag.constant.MetadataKeyConstant;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.store.embedding.elasticsearch.ElasticsearchEmbeddingStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +34,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -37,6 +44,8 @@ import java.util.UUID;
 public class DocumentHandleServiceImpl implements DocumentHandleService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentHandleServiceImpl.class);
+    private static final TypeReference<Map<String, Object>> METADATA_TYPE_REFERENCE = new TypeReference<>() {
+    };
 
     @Autowired
     private  KnowledgeDocumentService knowledgeDocumentService;
@@ -52,6 +61,10 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
     private MinioProperties minioProperties;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private OpenAiEmbeddingModel openAiEmbeddingModel;
+    @Autowired
+    private ElasticsearchEmbeddingStore elasticsearchEmbeddingStore;
 
     @Override
     public KnowledgeDocument upload(MultipartFile file, String uploadUser, String accessibleBy) {
@@ -132,6 +145,73 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
         }
     }
 
+    @Override
+    public boolean embedAndStore(KnowledgeDocument document) {
+        if (document == null || document.getDocId() == null) {
+            throw new IllegalArgumentException("待向量化文档不能为空");
+        }
+        if (document.getStatus() != DocumentStatus.CHUNKED) {
+            throw new IllegalStateException("当前文档状态为 " + document.getStatus() + "，不可向量化");
+        }
+
+        log.info("Start embedding document segments, docId={}", document.getDocId());
+        try {
+            // 只处理已切分且未跳过嵌入的片段，避免重复向量化或处理标题占位片段。
+            List<KnowledgeSegment> segments = knowledgeSegmentService.list(
+                    new LambdaQueryWrapper<KnowledgeSegment>()
+                            .eq(KnowledgeSegment::getDocumentId, document.getDocId())
+                            .eq(KnowledgeSegment::getStatus, SegmentStatus.STORED)
+                            .and(wrapper -> wrapper.isNull(KnowledgeSegment::getSkipEmbedding)
+                                    .or()
+                                    .ne(KnowledgeSegment::getSkipEmbedding, 1))
+                            .orderByAsc(KnowledgeSegment::getChunkOrder)
+            );
+            if (segments.isEmpty()) {
+                log.warn("No segments need embedding, docId={}", document.getDocId());
+                return false;
+            }
+
+            List<KnowledgeSegment> embeddableSegments = filterEmbeddableSegments(document, segments);
+            if (embeddableSegments.isEmpty()) {
+                log.warn("No valid text segments need embedding, docId={}", document.getDocId());
+                return false;
+            }
+
+            List<TextSegment> textSegments = embeddableSegments.stream().map(segment -> TextSegment.from(segment.getText(), Metadata.from(segment.getMetadataMap()))).toList();
+
+            log.info("Embedding model request started, docId={}, segmentCount={}", document.getDocId(), textSegments.size());
+            Response<List<Embedding>> response = openAiEmbeddingModel.embedAll(textSegments);
+            List<Embedding> embeddings = response.content();
+            if (embeddings.size() != textSegments.size()) {
+                throw new IllegalStateException("向量模型返回数量异常，segmentCount="
+                        + textSegments.size() + ", embeddingCount=" + (embeddings == null ? 0 : embeddings.size()));
+            }
+
+            // 写入向量库并保存返回的向量记录 ID，后续可以用于检索定位或删除。
+            List<String> embeddingIds = elasticsearchEmbeddingStore.addAll(embeddings, textSegments);
+            if (embeddingIds == null || embeddingIds.size() != embeddableSegments.size()) {
+                throw new IllegalStateException("向量库返回 ID 数量异常，segmentCount="
+                        + embeddableSegments.size() + ", embeddingIdCount=" + (embeddingIds == null ? 0 : embeddingIds.size()));
+            }
+            for (int i = 0; i < embeddableSegments.size(); i++) {
+                KnowledgeSegment segment = embeddableSegments.get(i);
+                segment.setEmbeddingId(embeddingIds.get(i));
+                segment.setStatus(SegmentStatus.VECTOR_STORED);
+            }
+            knowledgeSegmentService.updateBatchById(embeddableSegments);
+
+            KnowledgeDocument updateDocument = new KnowledgeDocument();
+            updateDocument.setDocId(document.getDocId());
+            updateDocument.setStatus(DocumentStatus.VECTOR_STORED);
+            knowledgeDocumentService.updateById(updateDocument);
+            log.info("Document embedding completed, docId={}, segmentCount={}", document.getDocId(), embeddableSegments.size());
+            return true;
+        } catch (Exception ex) {
+            log.error("Document embedding failed, docId={}", document.getDocId(), ex);
+            throw new IllegalStateException("文档向量化失败: " + ex.getMessage(), ex);
+        }
+    }
+
     private List<KnowledgeSegment> toKnowledgeSegments(KnowledgeDocument document, List<TextSegment> segments) {
         List<KnowledgeSegment> knowledgeSegments = new ArrayList<>();
         for (int i = 0; i < segments.size(); i++) {
@@ -163,6 +243,19 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
             knowledgeSegments.add(knowledgeSegment);
         }
         return knowledgeSegments;
+    }
+
+    private List<KnowledgeSegment> filterEmbeddableSegments(KnowledgeDocument document, List<KnowledgeSegment> segments) {
+        List<KnowledgeSegment> embeddableSegments = new ArrayList<>();
+        for (KnowledgeSegment segment : segments) {
+            if (segment == null || !StringUtils.hasText(segment.getText())) {
+                log.warn("Skip empty text segment during embedding, docId={}, segmentId={}",
+                        document.getDocId(), segment == null ? null : segment.getId());
+                continue;
+            }
+            embeddableSegments.add(segment);
+        }
+        return embeddableSegments;
     }
 
     private String resolveObjectName(String fileUrl) {

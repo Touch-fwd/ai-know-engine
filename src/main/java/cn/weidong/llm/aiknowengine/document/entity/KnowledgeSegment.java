@@ -1,17 +1,20 @@
 package cn.weidong.llm.aiknowengine.document.entity;
 
 import cn.weidong.llm.aiknowengine.document.constant.SegmentStatus;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Data
 @TableName("knowledge_segment")
@@ -73,5 +76,10 @@ public class KnowledgeSegment {
     @TableLogic
     @TableField("deleted")
     private Integer deleted;
+
+    @JsonIgnore
+    public Map<String, String> getMetadataMap() {
+        return metadata == null ? null : JSON.parseObject(metadata, Map.class);
+    }
 
 }

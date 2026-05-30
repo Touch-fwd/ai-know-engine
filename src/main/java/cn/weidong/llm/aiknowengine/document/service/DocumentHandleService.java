@@ -32,4 +32,12 @@ public interface DocumentHandleService {
      * @return 切分片段数量
      */
     int split(KnowledgeDocument document, DocumentSplitParam documentSplitParam);
+
+    /**
+     * 将已切分完成的文档片段向量化，并写入向量数据库。
+     *
+     * @param document 文档记录，状态必须为 CHUNKED
+     * @return 是否向量化成功
+     */
+    boolean embedAndStore(KnowledgeDocument document);
 }
