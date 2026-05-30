@@ -9,7 +9,8 @@ import cn.weidong.llm.aiknowengine.document.entity.KnowledgeSegment;
 import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import cn.weidong.llm.aiknowengine.document.service.*;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import cn.weidong.llm.aiknowengine.rag.constant.MetadataKeyConstant;
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentSplitter;
@@ -140,24 +141,28 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
             }
             KnowledgeSegment knowledgeSegment = new KnowledgeSegment();
             knowledgeSegment.setText(textSegment.text());
-            knowledgeSegment.setChunkId(UUID.randomUUID().toString());
-            knowledgeSegment.setMetadata(toMetadataJson(textSegment));
+            knowledgeSegment.setChunkId(textSegment.metadata().getString(MetadataKeyConstant.CHUNK_ID));
+
+            Metadata metadata = textSegment.metadata();
+            metadata.put(MetadataKeyConstant.DOC_ID, document.getDocId());
+            metadata.put(MetadataKeyConstant.FILE_NAME, document.getDocTitle());
+            metadata.put(MetadataKeyConstant.URL, document.getDocUrl());
+
+            knowledgeSegment.setMetadata(JSON.toJSONString(metadata.toMap()));
             knowledgeSegment.setDocumentId(document.getDocId());
             knowledgeSegment.setChunkOrder(i + 1);
             knowledgeSegment.setStatus(SegmentStatus.STORED);
-            knowledgeSegment.setSkipEmbedding(0);
+
+            // 检查是否需要跳过嵌入
+            Integer skipEmbedding = metadata.getInteger(MetadataKeyConstant.SKIP_EMBEDDING);
+            if (skipEmbedding != null && skipEmbedding == 1) {
+                knowledgeSegment.setSkipEmbedding(1);
+            } else {
+                knowledgeSegment.setSkipEmbedding(0);
+            }
             knowledgeSegments.add(knowledgeSegment);
         }
         return knowledgeSegments;
-    }
-
-    private String toMetadataJson(TextSegment textSegment) {
-        try {
-            return objectMapper.writeValueAsString(textSegment.metadata().toMap());
-        } catch (JsonProcessingException ex) {
-            log.warn("Failed to serialize text segment metadata", ex);
-            return "{}";
-        }
     }
 
     private String resolveObjectName(String fileUrl) {
