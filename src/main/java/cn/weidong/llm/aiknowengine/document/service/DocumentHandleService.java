@@ -1,6 +1,7 @@
 package cn.weidong.llm.aiknowengine.document.service;
 
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
+import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -22,4 +23,13 @@ public interface DocumentHandleService {
      * @return 文档记录
      */
     KnowledgeDocument upload(MultipartFile file, String uploadUser, String accessibleBy);
+
+    /**
+     * 切分已转换完成的文档。
+     *
+     * @param document 文档记录，状态必须为 CONVERTED
+     * @param documentSplitParam 切分参数
+     * @return 切分片段数量
+     */
+    int split(KnowledgeDocument document, DocumentSplitParam documentSplitParam);
 }
