@@ -11,6 +11,8 @@ spring:
       mode: always
       schema-locations: classpath:db/schema.sql
       continue-on-error: true
+  elasticsearch:
+    uris: http://localhost:9200
 
 mybatis-plus:
   configuration:
@@ -46,8 +48,16 @@ mineru:
 
 model:
   apiKey: ${DASHSCOPE_API_KEY:}
-  baseUrl: https://dashscope.aliyuncs.com/compatible-mode/
+  baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
   modelName: qwen3-vl-plus
   temperature: 0.7
   logRequests: true
   logResponses: true
+
+
+elasticsearch:
+  host: http://127.0.0.1:9200
+  base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model-name: text-embedding-v4
+  api-key: ${DASHSCOPE_API_KEY:}
+  dimensions: 1536

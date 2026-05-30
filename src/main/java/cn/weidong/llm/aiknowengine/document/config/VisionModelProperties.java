@@ -85,9 +85,13 @@ public class VisionModelProperties {
         if (baseUrl == null || baseUrl.isBlank()) {
             return "";
         }
-        if (baseUrl.endsWith("/")) {
-            return baseUrl.substring(0, baseUrl.length() - 1);
+        String normalized = baseUrl;
+        if (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
         }
-        return baseUrl;
+        if (normalized.endsWith("/compatible-mode")) {
+            return normalized + "/v1";
+        }
+        return normalized;
     }
 }

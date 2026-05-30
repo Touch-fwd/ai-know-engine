@@ -396,8 +396,8 @@ public class MinerUProcessBaseService {
             }
             matcher.appendReplacement(buffer, Matcher.quoteReplacement(replacement));
             imageCount++;
-            log.info("Markdown image processed, docId={}, imagePath={}, imageUrl={}, hasDescription={}",
-                    document.getDocId(), imagePath, imageUrl, StringUtils.hasText(imageDescription));
+            log.info("Markdown image processed, docId={}, imagePath={}, imageUrl={}, hasDescription={},imageDescription={}",
+                    document.getDocId(), imagePath, imageUrl, StringUtils.hasText(imageDescription),imageDescription);
         }
         matcher.appendTail(buffer);
         log.info("Markdown images processed, docId={}, imageCount={}", document.getDocId(), imageCount);
@@ -426,10 +426,13 @@ public class MinerUProcessBaseService {
             return null;
         }
         try {
+            String baseUrl = visionModelProperties.normalizedBaseUrl();
+            log.info("Generating image description, modelName={}, baseUrl={}",
+                    visionModelProperties.getModelName(), baseUrl);
             // 使用 OpenAI-compatible 协议调用视觉模型，具体供应商由配置中的 baseUrl 决定。
             OpenAiChatModel chatModel = OpenAiChatModel.builder()
                     .apiKey(visionModelProperties.getApiKey())
-                    .baseUrl(visionModelProperties.getBaseUrl())
+                    .baseUrl(baseUrl)
                     .modelName(visionModelProperties.getModelName())
                     .temperature(visionModelProperties.getTemperature())
                     .logRequests(visionModelProperties.isLogRequests())
@@ -444,7 +447,8 @@ public class MinerUProcessBaseService {
             log.info("Vision model image description generated, textLength={}", text == null ? 0 : text.length());
             return text;
         } catch (Exception ex) {
-            log.warn("Failed to generate image description", ex);
+            log.warn("Failed to generate image description, modelName={}, baseUrl={}",
+                    visionModelProperties.getModelName(), visionModelProperties.normalizedBaseUrl(), ex);
             return null;
         }
     }
