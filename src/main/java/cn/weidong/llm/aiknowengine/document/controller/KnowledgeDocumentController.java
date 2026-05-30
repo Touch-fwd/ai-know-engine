@@ -5,7 +5,7 @@ import cn.weidong.llm.aiknowengine.document.constant.FileType;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import cn.weidong.llm.aiknowengine.document.service.FileStorageService;
 import cn.weidong.llm.aiknowengine.document.service.KnowledgeDocumentService;
-import cn.weidong.llm.aiknowengine.document.service.MinerUProcessBaseService;
+import cn.weidong.llm.aiknowengine.document.service.MinerUProcessBaseServiceImpl;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,14 +26,14 @@ public class KnowledgeDocumentController {
 
     private final KnowledgeDocumentService knowledgeDocumentService;
     private final FileStorageService fileStorageService;
-    private final MinerUProcessBaseService minerUProcessBaseService;
+    private final MinerUProcessBaseServiceImpl minerUProcessBaseServiceImpl;
 
     public KnowledgeDocumentController(KnowledgeDocumentService knowledgeDocumentService,
                                        FileStorageService fileStorageService,
-                                       MinerUProcessBaseService minerUProcessBaseService) {
+                                       MinerUProcessBaseServiceImpl minerUProcessBaseServiceImpl) {
         this.knowledgeDocumentService = knowledgeDocumentService;
         this.fileStorageService = fileStorageService;
-        this.minerUProcessBaseService = minerUProcessBaseService;
+        this.minerUProcessBaseServiceImpl = minerUProcessBaseServiceImpl;
     }
 
     /**
@@ -75,7 +75,7 @@ public class KnowledgeDocumentController {
             if (pdf) {
                 log.info("Start MinerU parsing for PDF document, docId={}, fileName={}",
                         document.getDocId(), originalFilename);
-                KnowledgeDocument convertedDocument = minerUProcessBaseService.process(document, file.getInputStream());
+                KnowledgeDocument convertedDocument = minerUProcessBaseServiceImpl.process(document, file.getInputStream());
                 log.info("MinerU parsing completed for PDF document, docId={}, status={}, convertedDocUrl={}",
                         convertedDocument.getDocId(), convertedDocument.getStatus(), convertedDocument.getConvertedDocUrl());
                 return convertedDocument;

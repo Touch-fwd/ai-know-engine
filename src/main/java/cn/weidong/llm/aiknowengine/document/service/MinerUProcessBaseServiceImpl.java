@@ -12,6 +12,7 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -38,10 +39,9 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-@Service
-public class MinerUProcessBaseService {
+public abstract class MinerUProcessBaseServiceImpl implements FileProcessService {
 
-    private static final Logger log = LoggerFactory.getLogger(MinerUProcessBaseService.class);
+    private static final Logger log = LoggerFactory.getLogger(MinerUProcessBaseServiceImpl.class);
 
     private static final String APPLICATION_JSON = "application/json";
     private static final String APPLICATION_PDF = "application/pdf";
@@ -50,27 +50,25 @@ public class MinerUProcessBaseService {
     private static final String FAILED_STATE = "failed";
     private static final Pattern MARKDOWN_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)]\\(([^)]+)\\)");
 
-    private final MinerUProperties minerUProperties;
-    private final VisionModelProperties visionModelProperties;
-    private final KnowledgeDocumentService knowledgeDocumentService;
-    private final FileStorageService fileStorageService;
-    private final ObjectMapper objectMapper;
-    private final HttpClient httpClient;
+    @Autowired
+    private  MinerUProperties minerUProperties ;
+    @Autowired
+    private  VisionModelProperties visionModelProperties;
+    @Autowired
+    private  KnowledgeDocumentService knowledgeDocumentService;
+    @Autowired
+    private  FileStorageService fileStorageService;
 
-    public MinerUProcessBaseService(MinerUProperties minerUProperties,
-                                    VisionModelProperties visionModelProperties,
-                                    KnowledgeDocumentService knowledgeDocumentService,
-                                    FileStorageService fileStorageService,
-                                    ObjectMapper objectMapper) {
-        this.minerUProperties = minerUProperties;
-        this.visionModelProperties = visionModelProperties;
-        this.knowledgeDocumentService = knowledgeDocumentService;
-        this.fileStorageService = fileStorageService;
-        this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(30))
+            .build();
+
+    @Override
+    public void processDocument(KnowledgeDocument document, InputStream inputStream){
+        this.process(document,inputStream);
     }
+
 
     /**
      * 使用 MinerU 将 PDF 解析为 Markdown。
