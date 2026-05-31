@@ -6,6 +6,7 @@ import cn.weidong.llm.aiknowengine.document.constant.FileType;
 import cn.weidong.llm.aiknowengine.document.constant.SegmentStatus;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeSegment;
+import cn.weidong.llm.aiknowengine.document.event.DocumentSplitCompletedEvent;
 import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import cn.weidong.llm.aiknowengine.document.service.*;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
@@ -25,6 +26,7 @@ import dev.langchain4j.store.embedding.elasticsearch.ElasticsearchEmbeddingStore
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -72,6 +74,8 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
     private OpenAiEmbeddingModel openAiEmbeddingModel;
     @Autowired
     private ElasticsearchEmbeddingStore elasticsearchEmbeddingStore;
+    @Autowired
+    private ApplicationEventPublisher applicationEventPublisher;
 
     /**
      * 上传文档并触发对应格式的转换处理。
@@ -177,6 +181,8 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
             knowledgeDocumentService.updateById(updateDocument);
             document.setStatus(DocumentStatus.CHUNKED);
             log.info("Document split completed, docId={}, segmentCount={}", document.getDocId(), knowledgeSegments.size());
+            // 发布文档切换完成事件，实现文档向量化
+            applicationEventPublisher.publishEvent(new DocumentSplitCompletedEvent(document.getDocId()));
             return knowledgeSegments.size();
         } catch (Exception ex) {
             log.error("Document split failed, docId={}", document.getDocId(), ex);
