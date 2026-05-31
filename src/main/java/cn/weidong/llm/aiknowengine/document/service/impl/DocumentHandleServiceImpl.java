@@ -10,6 +10,7 @@ import cn.weidong.llm.aiknowengine.document.event.DocumentSplitCompletedEvent;
 import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import cn.weidong.llm.aiknowengine.document.service.*;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
+import cn.weidong.llm.aiknowengine.infra.lock.DistributeLock;
 import cn.weidong.llm.aiknowengine.rag.constant.MetadataKeyConstant;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
@@ -90,6 +91,7 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
      * @return 保存并处理后的文档记录
      */
     @Override
+    @DistributeLock(scene = "document-upload" ,keyExpression = "#uploadUser",waitTime = 0)
     public KnowledgeDocument upload(MultipartFile file, String uploadUser, String accessibleBy) {
         String originalFilename = file == null ? null : file.getOriginalFilename();
         long fileSize = file == null ? 0 : file.getSize();
@@ -141,6 +143,7 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
      * @return 成功保存的片段数量
      */
     @Override
+    @DistributeLock(scene = "document-split" ,keyExpression = "#document.docId",waitTime = 0)
     public int split(KnowledgeDocument document, DocumentSplitParam documentSplitParam) {
         // Step 1：校验文档基础信息和状态，避免重复切分或越过转换步骤。
         if (document == null || document.getDocId() == null) {
@@ -200,6 +203,7 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
      * @return true 表示向量化和入库成功；false 表示没有可处理片段
      */
     @Override
+    @DistributeLock(scene = "document-embed" ,keyExpression = "#document.docId",waitTime = 0)
     public boolean embedAndStore(KnowledgeDocument document) {
         // Step 1：检查状态机，只有完成切分后的文档才允许进入向量化。
         if (document == null || document.getDocId() == null) {
