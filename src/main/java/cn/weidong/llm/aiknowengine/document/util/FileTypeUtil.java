@@ -114,7 +114,7 @@ public final class FileTypeUtil {
         return null;
     }
 
-    private static FileType getFileTypeByFileName(String fileName) {
+    public static FileType getFileTypeByFileName(String fileName) {
         if (!StringUtils.hasText(fileName)) {
             return null;
         }

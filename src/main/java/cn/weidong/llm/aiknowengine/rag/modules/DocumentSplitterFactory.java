@@ -1,20 +1,18 @@
-package cn.weidong.llm.aiknowengine.document.service;
+package cn.weidong.llm.aiknowengine.rag.modules;
 
 import cn.weidong.llm.aiknowengine.document.constant.SplitType;
 import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
-import cn.weidong.llm.aiknowengine.rag.modules.DocumentByRegexSplitter;
-import cn.weidong.llm.aiknowengine.rag.modules.DocumentByWordSplitter;
-import cn.weidong.llm.aiknowengine.rag.modules.MarkdownHeaderParentTextSplitter;
 import dev.langchain4j.data.document.DocumentSplitter;
+import dev.langchain4j.data.document.splitter.DocumentByRegexSplitter;
+import dev.langchain4j.data.document.splitter.DocumentByWordSplitter;
 import org.springframework.stereotype.Component;
 
 /**
  * 文档切分器工厂。
  */
-@Component
 public class DocumentSplitterFactory {
 
-    public DocumentSplitter get(DocumentSplitParam param) {
+    public static DocumentSplitter get(DocumentSplitParam param) {
         int chunkSize = valueOrDefault(param == null ? null : param.chunkSize(), 1000);
         int overlap = valueOrDefault(param == null ? null : param.overlap(), 100);
         SplitType splitType = param == null || param.splitType() == null
@@ -30,7 +28,7 @@ public class DocumentSplitterFactory {
         };
     }
 
-    private int valueOrDefault(Integer value, int defaultValue) {
+    private static int valueOrDefault(Integer value, int defaultValue) {
         if (value == null || value <= 0) {
             return defaultValue;
         }

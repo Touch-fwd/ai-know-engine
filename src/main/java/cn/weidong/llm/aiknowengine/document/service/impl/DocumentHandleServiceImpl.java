@@ -14,6 +14,8 @@ import cn.weidong.llm.aiknowengine.document.service.*;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
 import cn.weidong.llm.aiknowengine.infra.lock.DistributeLock;
 import cn.weidong.llm.aiknowengine.rag.constant.MetadataKeyConstant;
+import cn.weidong.llm.aiknowengine.rag.modules.DocumentSplitterFactory;
+import cn.weidong.llm.aiknowengine.rag.modules.ExcelSplitter;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -33,7 +35,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -41,7 +42,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 默认文档处理服务实现。
@@ -130,16 +130,17 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
             // Step 4：存在处理器时执行转换，具体状态流转由对应处理器负责。
             if(fileProcessService != null){
                 fileProcessService.processDocument(document,uploadParam.file().getInputStream());
+            } else {
+                if (document.getKnowledgeBaseType() == KnowledgeBaseType.DOCUMENT_SEARCH) {
+                    document.setStatus(DocumentStatus.CONVERTED);
+                } else {
+                    document.setStatus(DocumentStatus.STORED);
+                }
+                document.setConvertedDocUrl(fileUrl);
+                result = knowledgeDocumentService.updateById(document);
+                Assert.isTrue(result, "文件状态更新失败");
             }
 
-            if (document.getKnowledgeBaseType() == KnowledgeBaseType.DOCUMENT_SEARCH) {
-                document.setStatus(DocumentStatus.CONVERTED);
-            } else {
-                document.setStatus(DocumentStatus.STORED);
-            }
-            document.setConvertedDocUrl(fileUrl);
-            result = knowledgeDocumentService.updateById(document);
-            Assert.isTrue(result, "文件状态更新失败");
 
             log.info("Knowledge document upload completed without MinerU parsing, docId={}, fileName={}",
                     document.getDocId(), originalFilename);
@@ -179,15 +180,21 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
         try {
             // Step 2：从转换结果 URL 中解析 MinIO 对象名，并下载 Markdown 内容。
             String objectName = resolveObjectName(document.getConvertedDocUrl());
-            String markdown;
+            List<TextSegment> segments;
             try (InputStream inputStream = fileStorageService.downloadFile(objectName)) {
-                markdown = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-            }
 
-            // Step 3：根据入参选择切分器，将 Markdown 转为 LangChain4j 的 TextSegment。
-            DocumentSplitter splitter = documentSplitterFactory.get(documentSplitParam);
-            Document splitDocument = Document.from(markdown, Metadata.from("docId", String.valueOf(document.getDocId())));
-            List<TextSegment> segments = splitter.split(splitDocument);
+                // Step 3：根据入参选择切分器，将 Markdown 转为 LangChain4j 的 TextSegment。
+                if (FileType.EXCEL == FileTypeUtil.getFileTypeByFileName(document.getConvertedDocUrl()) || FileType.CSV == FileTypeUtil.getFileTypeByFileName(document.getConvertedDocUrl())) {
+                    ExcelSplitter splitter = new ExcelSplitter(documentSplitParam.chunkSize(), false);
+                    segments = splitter.split(inputStream.readAllBytes());
+                } else {
+                    String markdown = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                    Document splitDocument = Document.from(markdown, Metadata.from("docId", String.valueOf(document.getDocId())));
+                    DocumentSplitter splitter = DocumentSplitterFactory.get(documentSplitParam);
+                    segments = splitter.split(splitDocument);
+                }
+
+            }
 
             // Step 4：转换为业务片段实体并保存，保留 docId、文件名、URL 等召回所需元数据。
             List<KnowledgeSegment> knowledgeSegments = toKnowledgeSegments(document, segments);
