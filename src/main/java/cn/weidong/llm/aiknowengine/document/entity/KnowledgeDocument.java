@@ -1,18 +1,24 @@
 package cn.weidong.llm.aiknowengine.document.entity;
 
 import cn.weidong.llm.aiknowengine.document.constant.DocumentStatus;
+import cn.weidong.llm.aiknowengine.document.constant.KnowledgeBaseType;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Data
 @TableName("knowledge_document")
@@ -60,7 +66,7 @@ public class KnowledgeDocument {
 
     /** 知识库类型：DOCUMENT_SEARCH, DATA_QUERY */
     @TableField("knowledge_base_type")
-    private String knowledgeBaseType;
+    private KnowledgeBaseType knowledgeBaseType;
 
     /** 扩展字段，保存JSON字符串 */
     @TableField("extension")
@@ -83,4 +89,32 @@ public class KnowledgeDocument {
     @TableLogic
     @TableField("deleted")
     private Integer deleted;
+
+    @JsonIgnore
+    public Boolean isOverride() {
+        if (extension != null && !extension.isEmpty()) {
+            return (Boolean) JSON.parseObject(extension, Map.class).get("isOverride");
+        }
+        return false;
+    }
+
+    @JsonIgnore
+    public String getTableName() {
+        if (extension != null && !extension.isEmpty()) {
+            return (String) JSON.parseObject(extension, Map.class).get("tableName");
+        }
+        return null;
+    }
+
+    @JsonIgnore
+    public void setTableName(String tableName) {
+        Map<String, Serializable> extensionMap;
+        if (extension == null) {
+            extensionMap = new HashMap<String, Serializable>();
+        } else {
+            extensionMap = JSON.parseObject(extension, Map.class);
+        }
+        extensionMap.put("tableName", tableName);
+        this.extension = JSON.toJSONString(extensionMap);
+    }
 }

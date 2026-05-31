@@ -1,5 +1,6 @@
 package cn.weidong.llm.aiknowengine.document.controller;
 
+import cn.weidong.llm.aiknowengine.document.entity.DocumentUploadParam;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import cn.weidong.llm.aiknowengine.document.service.DocumentHandleService;
 import org.slf4j.Logger;
@@ -33,16 +34,26 @@ public class KnowledgeDocumentController {
      *
      * @param file 上传文件
      * @param uploadUser 上传用户
+     * @param title 文档标题
      * @param accessibleBy 可见范围
+     * @param description 文档描述
+     * @param knowledgeBaseType 知识库类型
+     * @param tableName 数据查询表名
      * @return 文档记录
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public KnowledgeDocument upload(@RequestParam MultipartFile file,
                                     @RequestParam(required = false) String uploadUser,
-                                    @RequestParam(required = false) String accessibleBy) {
+                                    @RequestParam(required = false) String title,
+                                    @RequestParam(required = false) String accessibleBy,
+                                    @RequestParam(required = false) String description,
+                                    @RequestParam(required = false) String knowledgeBaseType,
+                                    @RequestParam(required = false) String tableName) {
         String originalFilename = file == null ? null : file.getOriginalFilename();
+        DocumentUploadParam documentUploadParam = new DocumentUploadParam(
+                file, uploadUser, title, accessibleBy, description, knowledgeBaseType, tableName);
         try {
-            return documentHandleService.upload(file, uploadUser, accessibleBy);
+            return documentHandleService.upload(documentUploadParam);
         } catch (Exception ex) {
             log.error("Knowledge document upload failed, fileName={}, uploadUser={}", originalFilename, uploadUser, ex);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);

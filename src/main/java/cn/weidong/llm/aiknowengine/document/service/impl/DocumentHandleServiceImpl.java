@@ -3,7 +3,9 @@ package cn.weidong.llm.aiknowengine.document.service.impl;
 import cn.weidong.llm.aiknowengine.document.config.MinioProperties;
 import cn.weidong.llm.aiknowengine.document.constant.DocumentStatus;
 import cn.weidong.llm.aiknowengine.document.constant.FileType;
+import cn.weidong.llm.aiknowengine.document.constant.KnowledgeBaseType;
 import cn.weidong.llm.aiknowengine.document.constant.SegmentStatus;
+import cn.weidong.llm.aiknowengine.document.entity.DocumentUploadParam;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeSegment;
 import cn.weidong.llm.aiknowengine.document.event.DocumentSplitCompletedEvent;
@@ -29,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -85,49 +88,64 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
      * 如果文件类型存在对应的 {@link FileProcessService}，则继续执行解析转换流程，
      * 例如 PDF 会转换为 Markdown 并更新文档状态为 CONVERTED。
      *
-     * @param file 上传的原始文件
-     * @param uploadUser 上传用户
-     * @param accessibleBy 文档可见范围
+     * @param uploadParam 上传参数
      * @return 保存并处理后的文档记录
      */
     @Override
-    @DistributeLock(scene = "document-upload" ,keyExpression = "#uploadUser",waitTime = 0)
-    public KnowledgeDocument upload(MultipartFile file, String uploadUser, String accessibleBy) {
-        String originalFilename = file == null ? null : file.getOriginalFilename();
-        long fileSize = file == null ? 0 : file.getSize();
+    @DistributeLock(scene = "document-upload" ,keyExpression = "#uploadParam.uploadUser",waitTime = 0)
+    public KnowledgeDocument upload(DocumentUploadParam uploadParam) {
+        String originalFilename = uploadParam.file() == null ? null : uploadParam.file().getOriginalFilename();
+        long fileSize = uploadParam.file() == null ? 0 : uploadParam.file().getSize();
+        KnowledgeBaseType knowledgeBaseType = StringUtils.hasText(uploadParam.knowledgeBaseType())
+                ? KnowledgeBaseType.valueOf(uploadParam.knowledgeBaseType())
+                : KnowledgeBaseType.DOCUMENT_SEARCH;
         log.info("Start uploading knowledge document, fileName={}, size={}, uploadUser={}, accessibleBy={}",
-                originalFilename, fileSize, uploadUser, accessibleBy);
+                originalFilename, fileSize, uploadParam.uploadUser(), uploadParam.accessibleBy());
         try {
             // Step 1：先保存原始文件，确保后续转换失败时也能追溯原始上传内容。
-            String fileUrl = fileStorageService.uploadFile(file, originalFilename);
+            String fileUrl = fileStorageService.uploadFile(uploadParam.file(), originalFilename);
             log.info("Knowledge document file uploaded to storage, fileName={}, fileUrl={}", originalFilename, fileUrl);
 
             // Step 2：创建文档主表记录，初始状态为 UPLOADED。
             KnowledgeDocument document = new KnowledgeDocument();
-            document.setDocTitle(originalFilename);
-            document.setUploadUser(uploadUser);
-            document.setAccessibleBy(accessibleBy);
+            document.setDocTitle(StringUtils.hasText(uploadParam.title()) ? uploadParam.title() : originalFilename);
+            document.setUploadUser(uploadParam.uploadUser());
+            document.setAccessibleBy(uploadParam.accessibleBy());
+            document.setDescription(uploadParam.description());
+            document.setKnowledgeBaseType(knowledgeBaseType);
+            document.setTableName(uploadParam.tableName());
             document.setDocUrl(fileUrl);
             document.setStatus(DocumentStatus.UPLOADED);
-            knowledgeDocumentService.save(document);
+            boolean result = knowledgeDocumentService.save(document);
+
+            Assert.isTrue(result, "文件上传失败");
             log.info("Knowledge document saved, docId={}, status={}", document.getDocId(), document.getStatus());
 
 
             // Step 3：根据文件后缀和内容识别文件类型，再选择对应处理器。
-            FileType fileType = FileTypeUtil.getFileType(file);
+            FileType fileType = FileTypeUtil.getFileType(uploadParam.file());
 
-            FileProcessService fileProcessService = fileProcessServiceFactory.get(fileType);
+            FileProcessService fileProcessService = fileProcessServiceFactory.get(fileType,document.getKnowledgeBaseType());
 
             // Step 4：存在处理器时执行转换，具体状态流转由对应处理器负责。
             if(fileProcessService != null){
-                fileProcessService.processDocument(document,file.getInputStream());
+                fileProcessService.processDocument(document,uploadParam.file().getInputStream());
             }
+
+            if (document.getKnowledgeBaseType() == KnowledgeBaseType.DOCUMENT_SEARCH) {
+                document.setStatus(DocumentStatus.CONVERTED);
+            } else {
+                document.setStatus(DocumentStatus.STORED);
+            }
+            document.setConvertedDocUrl(fileUrl);
+            result = knowledgeDocumentService.updateById(document);
+            Assert.isTrue(result, "文件状态更新失败");
 
             log.info("Knowledge document upload completed without MinerU parsing, docId={}, fileName={}",
                     document.getDocId(), originalFilename);
             return document;
         } catch (Exception ex) {
-            log.error("Knowledge document upload failed, fileName={}, uploadUser={}", originalFilename, uploadUser, ex);
+            log.error("Knowledge document upload failed, fileName={}, uploadUser={}", originalFilename, uploadParam.uploadUser(), ex);
             throw new IllegalStateException("Knowledge document upload failed", ex);
         }
     }

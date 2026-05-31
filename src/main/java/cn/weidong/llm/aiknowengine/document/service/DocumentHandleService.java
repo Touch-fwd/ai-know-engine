@@ -1,5 +1,6 @@
 package cn.weidong.llm.aiknowengine.document.service;
 
+import cn.weidong.llm.aiknowengine.document.entity.DocumentUploadParam;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,12 +18,9 @@ public interface DocumentHandleService {
      * 文件会先上传到 MinIO 并保存文档记录；如果是 PDF，则继续调用 MinerU 完成转换，
      * 最终返回转换后的文档信息。
      *
-     * @param file 上传文件
-     * @param uploadUser 上传用户
-     * @param accessibleBy 可见范围
      * @return 文档记录
      */
-    KnowledgeDocument upload(MultipartFile file, String uploadUser, String accessibleBy);
+    KnowledgeDocument upload(DocumentUploadParam documentUploadParam);
 
     /**
      * 切分已转换完成的文档。

@@ -1,6 +1,7 @@
 package cn.weidong.llm.aiknowengine.document.service;
 
 import cn.weidong.llm.aiknowengine.document.constant.FileType;
+import cn.weidong.llm.aiknowengine.document.constant.KnowledgeBaseType;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 
 import java.io.InputStream;
@@ -23,6 +24,6 @@ public interface FileProcessService {
     /**
      * 判断是否支持该文件
      */
-    boolean supports(FileType fileType);
+    boolean supports(FileType fileType, KnowledgeBaseType knowledgeBaseType);
 }
 
