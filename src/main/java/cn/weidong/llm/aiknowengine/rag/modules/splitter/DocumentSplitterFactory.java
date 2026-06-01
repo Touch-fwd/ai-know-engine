@@ -1,11 +1,10 @@
-package cn.weidong.llm.aiknowengine.rag.modules;
+package cn.weidong.llm.aiknowengine.rag.modules.splitter;
 
 import cn.weidong.llm.aiknowengine.document.constant.SplitType;
 import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import dev.langchain4j.data.document.DocumentSplitter;
 import dev.langchain4j.data.document.splitter.DocumentByRegexSplitter;
 import dev.langchain4j.data.document.splitter.DocumentByWordSplitter;
-import org.springframework.stereotype.Component;
 
 /**
  * 文档切分器工厂。

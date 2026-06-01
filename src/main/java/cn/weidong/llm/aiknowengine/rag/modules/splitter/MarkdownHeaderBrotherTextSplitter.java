@@ -1,4 +1,4 @@
-package cn.weidong.llm.aiknowengine.rag.modules;
+package cn.weidong.llm.aiknowengine.rag.modules.splitter;
 
 
 import cn.weidong.llm.aiknowengine.infra.snowflake.SnowflakeIdGenerator;
