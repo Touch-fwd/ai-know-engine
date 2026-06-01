@@ -13,6 +13,11 @@ spring:
       continue-on-error: true
   elasticsearch:
     uris: http://localhost:9200
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: neo4j666
 
 mybatis-plus:
   configuration:
