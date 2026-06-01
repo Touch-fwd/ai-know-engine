@@ -1,6 +1,7 @@
 package cn.weidong.llm.aiknowengine.rag.modules;
 
 import cn.weidong.llm.aiknowengine.chat.service.ChatMessageService;
+import cn.weidong.llm.aiknowengine.common.SpringContextHolder;
 import com.google.common.base.Stopwatch;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
@@ -10,6 +11,7 @@ import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
 import dev.langchain4j.rag.query.Query;
 import dev.langchain4j.rag.query.transformer.QueryTransformer;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 
@@ -71,29 +73,26 @@ public class KnowEngineQueryTransformer implements QueryTransformer {
      */
     private final Consumer<String> progressCallback;
 
-    /**
-     * Spring 容器，由使用方在构造时传入
-     */
-    private static volatile ApplicationContext applicationContext;
-
-    /**
-     * 注册全局 ApplicationContext（由 SpringContextHolder 调用一次即可）
-     */
-    public static void setApplicationContext(ApplicationContext ctx) {
-        applicationContext = ctx;
-    }
-
-    private ChatMessageService getChatMessageService() {
-        if (applicationContext == null) {
-            return null;
-        }
-        try {
-            return applicationContext.getBean(ChatMessageService.class);
-        } catch (Exception e) {
-            log.warn("获取 ChatMessageService 失败", e);
-            return null;
-        }
-    }
+//    /**
+//     * Spring 容器，由使用方在构造时传入
+//     * -- SETTER --
+//     *  注册全局 ApplicationContext（由 SpringContextHolder 调用一次即可）
+//
+//     */
+//    @Setter
+//    private static volatile ApplicationContext applicationContext;
+//
+//    private ChatMessageService getChatMessageService() {
+//        if (applicationContext == null) {
+//            return null;
+//        }
+//        try {
+//            return applicationContext.getBean(ChatMessageService.class);
+//        } catch (Exception e) {
+//            log.warn("获取 ChatMessageService 失败", e);
+//            return null;
+//        }
+//    }
 
     private static final PromptTemplate LG_AGENT_PROMPT = PromptTemplate.from("""
             你是一个汽车智能客服助手，你的职责范围是汽车相关的咨询场景，包括购车咨询、车型信息、保养维修、保险年检、售后服务等。你需要对用户的问题进行改写，使得改写后的问题在查询向量数据库/关系型数据库/图数据库时有更好的结果，并删除任何无关信息，确保查询简洁明了、具体明确。下面有一些改写的策略。
@@ -177,17 +176,15 @@ public class KnowEngineQueryTransformer implements QueryTransformer {
 
         // 异步回写改写结果到 chat_message
         if (chatMessageId != null) {
-            ChatMessageService chatMessageService = getChatMessageService();
-            if (chatMessageService != null) {
-                runAsync(() -> {
-                    try {
-                        chatMessageService.updateTransformContent(chatMessageId, newQuery);
-                        log.info("改写结果已回写: assistantMsgId={}, transformContent={}", chatMessageId, newQuery);
-                    } catch (Exception e) {
-                        log.warn("改写结果回写失败: assistantMsgId={}", chatMessageId, e);
-                    }
-                });
-            }
+            ChatMessageService chatMessageService = SpringContextHolder.getBean(ChatMessageService.class);
+            runAsync(() -> {
+                try {
+                    chatMessageService.updateTransformContent(chatMessageId, newQuery);
+                    log.info("改写结果已回写: assistantMsgId={}, transformContent={}", chatMessageId, newQuery);
+                } catch (Exception e) {
+                    log.warn("改写结果回写失败: assistantMsgId={}", chatMessageId, e);
+                }
+            });
         }
 
 //        return List.of(compressedQuery, query);
