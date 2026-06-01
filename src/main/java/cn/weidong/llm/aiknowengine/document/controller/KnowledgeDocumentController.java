@@ -2,17 +2,23 @@ package cn.weidong.llm.aiknowengine.document.controller;
 
 import cn.weidong.llm.aiknowengine.document.entity.DocumentUploadParam;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
+import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import cn.weidong.llm.aiknowengine.document.service.DocumentHandleService;
+import cn.weidong.llm.aiknowengine.document.service.KnowledgeDocumentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/knowledge-documents")
@@ -21,9 +27,12 @@ public class KnowledgeDocumentController {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeDocumentController.class);
 
     private final DocumentHandleService documentHandleService;
+    private final KnowledgeDocumentService knowledgeDocumentService;
 
-    public KnowledgeDocumentController(DocumentHandleService documentHandleService) {
+    public KnowledgeDocumentController(DocumentHandleService documentHandleService,
+                                       KnowledgeDocumentService knowledgeDocumentService) {
         this.documentHandleService = documentHandleService;
+        this.knowledgeDocumentService = knowledgeDocumentService;
     }
 
     /**
@@ -58,5 +67,57 @@ public class KnowledgeDocumentController {
             log.error("Knowledge document upload failed, fileName={}, uploadUser={}", originalFilename, uploadUser, ex);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * 切分知识文档。
+     *
+     * @param docId 文档 ID
+     * @param documentSplitParam 切分参数
+     * @return 切分结果
+     */
+    @PostMapping(value = "/{docId}/split", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> split(@PathVariable Long docId,
+                                     @RequestBody(required = false) DocumentSplitParam documentSplitParam) {
+        KnowledgeDocument document = getDocument(docId);
+        try {
+            int segmentCount = documentHandleService.split(document, documentSplitParam);
+            return Map.of(
+                    "docId", docId,
+                    "segmentCount", segmentCount
+            );
+        } catch (Exception ex) {
+            log.error("Knowledge document split failed, docId={}", docId, ex);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * 向量化并存储知识文档片段。
+     *
+     * @param docId 文档 ID
+     * @return 向量化结果
+     */
+    @PostMapping("/{docId}/embed-and-store")
+    public Map<String, Object> embedAndStore(@PathVariable Long docId) {
+        KnowledgeDocument document = getDocument(docId);
+        try {
+            boolean stored = documentHandleService.embedAndStore(document);
+            return Map.of(
+                    "docId", docId,
+                    "stored", stored
+            );
+        } catch (Exception ex) {
+            log.error("Knowledge document embedding failed, docId={}", docId, ex);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
+    }
+
+    private KnowledgeDocument getDocument(Long docId) {
+        KnowledgeDocument document = knowledgeDocumentService.getById(docId);
+        if (document == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "文档不存在: " + docId);
+        }
+        return document;
     }
 }
