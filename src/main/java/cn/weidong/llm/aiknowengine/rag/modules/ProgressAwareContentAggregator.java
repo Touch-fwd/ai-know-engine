@@ -1,7 +1,9 @@
 package cn.weidong.llm.aiknowengine.rag.modules;
 
+import cn.weidong.llm.aiknowengine.chat.constants.RetrievalSource;
 import cn.weidong.llm.aiknowengine.chat.entity.ChatMessage;
 import cn.weidong.llm.aiknowengine.chat.service.ChatMessageService;
+import cn.weidong.llm.aiknowengine.rag.util.ReferenceUtil;
 import com.alibaba.fastjson2.JSON;
 import dev.langchain4j.rag.content.Content;
 import dev.langchain4j.rag.content.aggregator.ContentAggregator;

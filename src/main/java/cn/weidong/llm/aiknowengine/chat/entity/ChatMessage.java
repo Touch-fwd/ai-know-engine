@@ -1,5 +1,6 @@
 package cn.weidong.llm.aiknowengine.chat.entity;
 
+import cn.weidong.llm.aiknowengine.chat.constants.ChatMessageType;
 import cn.weidong.llm.aiknowengine.chat.constants.RetrievalSource;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -20,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 @Data
-@TableName("chat_message")
+@TableName(value = "chat_message", autoResultMap = true)
 public class ChatMessage {
 
     /** 主键ID */
@@ -43,7 +44,7 @@ public class ChatMessage {
     @NotBlank
     @Size(max = 32)
     @TableField("type")
-    private String type;
+    private ChatMessageType type;
 
     /** 消息内容 */
     @TableField("content")
@@ -92,13 +93,13 @@ public class ChatMessage {
      * RAG引用内容JSON数组
      * 包含document_id、document_title、chunk_id、chunk_content、similarity_score、retrieval_source等字段
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "rag_references", typeHandler = JacksonTypeHandler.class)
     private List<RagReference> ragReferences;
 
     /**
      * 扩展元数据JSON格式
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "metadata", typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> metadata;
 
     /**
