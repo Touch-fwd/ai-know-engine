@@ -105,21 +105,23 @@ public class ChatController {
     /**
      * 流式对话接口
      * <p>
-     * 入参：userId、content（用户问题）、conversationId（可选）
+     * 入参：JSON body，包含 userId、content（用户问题）、conversationId（可选）
      * 返回：SSE 流，每个 token 逐字推送；流结束前推送一条 [DONE] 事件携带 conversationId
      * <p>
      * 进度通知格式：{@code [PROGRESS]:xxx...}，用于在前端展示当前处理阶段，减少等待焦虑。
      * 推送环节包括：意图识别、问题改写、问题路由、排序筛选、生成回答等。
      *
-     * @param userId         用户ID
-     * @param content        用户问题
-     * @param conversationId 会话ID（可选，不传则自动创建新会话）
+     * @param request 流式对话请求
      */
-    @PostMapping(value = "/steam", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> send(
-            @RequestParam String userId,
-            @RequestParam String content,
-            @RequestParam(required = false) String conversationId) {
+            @RequestBody ChatStreamRequest request) {
+        String userId = request == null ? null : request.userId();
+        String content = request == null ? null : request.content();
+        String conversationId = request == null ? null : request.conversationId();
+        if (!StringUtils.hasText(userId) || !StringUtils.hasText(content)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userId 和 content 不能为空");
+        }
 
         // 1. 处理会话：没有 conversationId 则创建新会话
         final String finalConversationId;
@@ -164,7 +166,7 @@ public class ChatController {
         // 3. 流式返回：先发送意图识别进度，再执行意图识别
         //    使用 Mono.fromCallable + subscribeOn(boundedElastic) 将阻塞调用移到弹性线程池，
         //    释放 WebFlux 事件循环，确保进度消息能立即 flush 到前端
-        return Flux.just("[PROGRESS]:正在识别您的意图...")
+        Flux<String> chatStream = Flux.just("[PROGRESS]:正在识别您的意图...")
                 .concatWith(
                         Mono.fromCallable(() -> intentRecognitionService.chat(finalConversationId, content))
                                 .subscribeOn(Schedulers.boundedElastic())
@@ -189,9 +191,30 @@ public class ChatController {
                                     return chatApplicationService.chat(new ChatParam(userId, finalConversationId, messageId, content, assistantMessageId, intentRecognitionResult));
                                 })
                 )
-                .doOnError(e -> log.error("流式对话异常: conversationId={}", finalConversationId, e))
-                // 6. 在流末尾追加一条 [DONE] 事件，携带 conversationId
-                .concatWith(Mono.just("[DONE]:" + finalConversationId));
+                .doOnError(e -> log.error("流式对话异常: conversationId={}", finalConversationId, e));
+
+        return Flux.just(toSse("conversation", "{\"conversationId\":\"" + finalConversationId + "\"}"))
+                .concatWith(chatStream.map(this::toChatSse))
+                .concatWith(Mono.just(toSse("done", finalConversationId)));
+    }
+
+    private String toChatSse(String data) {
+        if (data != null && data.startsWith("[PROGRESS]:")) {
+            return toSse("progress", data.substring("[PROGRESS]:".length()));
+        }
+        return toSse("delta", data);
+    }
+
+    private String toSse(String event, String data) {
+        String safeData = data == null ? "" : data.replace("\r", "");
+        StringBuilder builder = new StringBuilder("event: ").append(event).append('\n');
+        for (String line : safeData.split("\n", -1)) {
+            builder.append("data: ").append(line).append('\n');
+        }
+        return builder.append('\n').toString();
+    }
+
+    public record ChatStreamRequest(String userId, String content, String conversationId) {
     }
 
     @GetMapping("/conversations")

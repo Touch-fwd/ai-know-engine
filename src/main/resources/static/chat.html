@@ -372,6 +372,7 @@
         removeEmpty();
         appendMessage('user', content);
         const assistantNode = appendMessage('assistant', '');
+        let showingProgress = false;
 
         try {
             const response = await fetch(`${api}/stream`, {
@@ -393,7 +394,16 @@
                     deleteButton.disabled = false;
                     chatMeta.textContent = meta.conversationId;
                 },
+                progress: (data) => {
+                    assistantNode.textContent = data;
+                    showingProgress = true;
+                    messages.scrollTop = messages.scrollHeight;
+                },
                 delta: (data) => {
+                    if (showingProgress) {
+                        assistantNode.textContent = '';
+                        showingProgress = false;
+                    }
                     assistantNode.textContent += data;
                     messages.scrollTop = messages.scrollHeight;
                 },

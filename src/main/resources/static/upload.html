@@ -211,6 +211,21 @@
             border-color: var(--accent);
         }
 
+        input:disabled {
+            background: #f3f5f4;
+            color: var(--muted);
+        }
+
+        label.is-required {
+            color: var(--text);
+        }
+
+        label.is-required::after {
+            content: "必填，仅字母数字下划线";
+            color: var(--muted);
+            font-size: 12px;
+        }
+
         input[type="file"] {
             position: absolute;
             width: 1px;
@@ -523,6 +538,17 @@
                         可见范围
                         <input id="accessibleBy" name="accessibleBy" type="text" maxlength="1024" autocomplete="off">
                     </label>
+                    <label>
+                        知识库类型
+                        <select id="knowledgeBaseType" name="knowledgeBaseType">
+                            <option value="DOCUMENT_SEARCH">文档搜索</option>
+                            <option value="DATA_QUERY">数据查询</option>
+                        </select>
+                    </label>
+                    <label id="tableNameField">
+                        表名
+                        <input id="tableName" name="tableName" type="text" maxlength="64" autocomplete="off" pattern="[A-Za-z0-9_]+">
+                    </label>
                 </div>
 
                 <div id="message" class="message" role="alert"></div>
@@ -613,6 +639,9 @@
     const fileSize = document.getElementById("fileSize");
     const uploadUser = document.getElementById("uploadUser");
     const accessibleBy = document.getElementById("accessibleBy");
+    const knowledgeBaseType = document.getElementById("knowledgeBaseType");
+    const tableName = document.getElementById("tableName");
+    const tableNameField = document.getElementById("tableNameField");
     const message = document.getElementById("message");
     const submitButton = document.getElementById("submitButton");
     const resetButton = document.getElementById("resetButton");
@@ -675,7 +704,9 @@
     });
 
     splitType.addEventListener("change", renderSplitFields);
+    knowledgeBaseType.addEventListener("change", renderKnowledgeBaseFields);
     renderSplitFields();
+    renderKnowledgeBaseFields();
 
     resetButton.addEventListener("click", () => {
         uploadForm.reset();
@@ -689,6 +720,7 @@
         resultDetails.hidden = true;
         emptyState.hidden = false;
         splitPanel.classList.remove("is-visible");
+        renderKnowledgeBaseFields();
         clearSplitResult();
         clearMessage();
     });
@@ -700,11 +732,16 @@
             showMessage("请选择要上传的文档。", "warn");
             return;
         }
+        if (!validateUploadForm()) {
+            return;
+        }
 
         const formData = new FormData();
         formData.append("file", file);
         formData.append("uploadUser", uploadUser.value.trim());
         formData.append("accessibleBy", accessibleBy.value.trim());
+        formData.append("knowledgeBaseType", knowledgeBaseType.value);
+        formData.append("tableName", tableName.value.trim());
 
         submitButton.disabled = true;
         resetButton.disabled = true;
@@ -865,6 +902,35 @@
     function renderSplitFields() {
         separatorField.classList.toggle("is-visible", splitType.value === "SEPARATOR");
         regexField.classList.toggle("is-visible", splitType.value === "REGEX");
+    }
+
+    function renderKnowledgeBaseFields() {
+        const dataQuery = knowledgeBaseType.value === "DATA_QUERY";
+        tableName.required = dataQuery;
+        tableName.disabled = !dataQuery;
+        tableNameField.classList.toggle("is-required", dataQuery);
+        if (!dataQuery) {
+            tableName.value = "";
+            tableName.setCustomValidity("");
+        }
+    }
+
+    function validateUploadForm() {
+        if (knowledgeBaseType.value !== "DATA_QUERY") {
+            return true;
+        }
+        const value = tableName.value.trim();
+        if (!value) {
+            showMessage("数据查询类型必须填写表名。", "warn");
+            tableName.focus();
+            return false;
+        }
+        if (!/^[A-Za-z0-9_]+$/.test(value)) {
+            showMessage("表名只能包含字母、数字和下划线。", "warn");
+            tableName.focus();
+            return false;
+        }
+        return true;
     }
 
     function toPositiveInteger(value) {
