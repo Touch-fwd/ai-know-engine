@@ -196,22 +196,6 @@ public class ChatController {
                 .concatWith(Mono.just("[DONE]:" + finalConversationId));
     }
 
-    private String toChatSse(String data) {
-        if (data != null && data.startsWith("[PROGRESS]:")) {
-            return toSse("progress", data.substring("[PROGRESS]:".length()));
-        }
-        return toSse("delta", data);
-    }
-
-    private String toSse(String event, String data) {
-        String safeData = data == null ? "" : data.replace("\r", "");
-        StringBuilder builder = new StringBuilder("event: ").append(event).append('\n');
-        for (String line : safeData.split("\n", -1)) {
-            builder.append("data: ").append(line).append('\n');
-        }
-        return builder.append('\n').toString();
-    }
-
     public record ChatStreamRequest(String userId, String content, String conversationId) {
     }
 
