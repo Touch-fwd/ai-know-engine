@@ -152,7 +152,7 @@ public class ChatController {
         String assistantMessageId = chatMessageService.saveAssistantMessage(finalConversationId);
 
         // 清除该会话的内存缓存，确保从DB重新加载最新消息（含刚保存的用户消息）
-//        databaseChatMemoryStore.evictCache(finalConversationId);
+        databaseChatMemoryStore.evictCache(finalConversationId);
 
         // 3. 流式返回：先发送意图识别进度，再执行意图识别
         //    使用 Mono.fromCallable + subscribeOn(boundedElastic) 将阻塞调用移到弹性线程池，
