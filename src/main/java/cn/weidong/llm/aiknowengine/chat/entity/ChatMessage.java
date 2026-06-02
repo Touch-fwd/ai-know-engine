@@ -1,16 +1,23 @@
 package cn.weidong.llm.aiknowengine.chat.entity;
 
+import cn.weidong.llm.aiknowengine.chat.constants.RetrievalSource;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Data
 @TableName("chat_message")
@@ -55,9 +62,9 @@ public class ChatMessage {
     @TableField("model_name")
     private String modelName;
 
-    /** RAG引用内容JSON数组 */
-    @TableField("rag_references")
-    private String ragReferences;
+//    /** RAG引用内容JSON数组 */
+//    @TableField("rag_references")
+//    private String ragReferences;
 
     /** 创建时间 */
     @TableField("created_at")
@@ -78,6 +85,71 @@ public class ChatMessage {
     private Integer deleted;
 
     /** 扩展元数据JSON格式 */
-    @TableField("metadata")
-    private String metadata;
+//    @TableField("metadata")
+//    private String metadata;
+
+    /**
+     * RAG引用内容JSON数组
+     * 包含document_id、document_title、chunk_id、chunk_content、similarity_score、retrieval_source等字段
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<RagReference> ragReferences;
+
+    /**
+     * 扩展元数据JSON格式
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> metadata;
+
+    /**
+     * RAG引用内容内部类
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RagReference {
+        /**
+         * 文档ID
+         */
+        private String documentId;
+
+        /**
+         * 文档URL
+         */
+        private String url;
+
+        /**
+         * 文档标题
+         */
+        private String documentTitle;
+
+        /**
+         * 文档块ID
+         */
+        private String chunkId;
+
+        /**
+         * 文档块内容
+         */
+        private String chunkContent;
+
+        /**
+         * 相似度分数
+         */
+        private Double similarityScore;
+
+        private Double rerankScore;
+
+        /**
+         * 检索来源：vector/keyword/hybrid/rerank
+         */
+        private RetrievalSource retrievalSource;
+
+        /**
+         * 扩展元数据
+         */
+        private Map<String, Object> metadata;
+
+    }
 }
