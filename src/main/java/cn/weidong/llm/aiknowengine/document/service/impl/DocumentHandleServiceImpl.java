@@ -69,8 +69,6 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
     @Autowired
     private KnowledgeSegmentService knowledgeSegmentService;
     @Autowired
-    private DocumentSplitterFactory documentSplitterFactory;
-    @Autowired
     private MinioProperties minioProperties;
     @Autowired
     private ObjectMapper objectMapper;
