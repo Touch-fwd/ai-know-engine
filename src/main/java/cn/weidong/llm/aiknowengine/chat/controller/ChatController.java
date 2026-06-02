@@ -166,7 +166,7 @@ public class ChatController {
         // 3. 流式返回：先发送意图识别进度，再执行意图识别
         //    使用 Mono.fromCallable + subscribeOn(boundedElastic) 将阻塞调用移到弹性线程池，
         //    释放 WebFlux 事件循环，确保进度消息能立即 flush 到前端
-        Flux<String> chatStream = Flux.just("[PROGRESS]:正在识别您的意图...")
+        return Flux.just("[PROGRESS]:正在识别您的意图...")
                 .concatWith(
                         Mono.fromCallable(() -> intentRecognitionService.chat(finalConversationId, content))
                                 .subscribeOn(Schedulers.boundedElastic())
@@ -191,11 +191,9 @@ public class ChatController {
                                     return chatApplicationService.chat(new ChatParam(userId, finalConversationId, messageId, content, assistantMessageId, intentRecognitionResult));
                                 })
                 )
-                .doOnError(e -> log.error("流式对话异常: conversationId={}", finalConversationId, e));
-
-        return Flux.just(toSse("conversation", "{\"conversationId\":\"" + finalConversationId + "\"}"))
-                .concatWith(chatStream.map(this::toChatSse))
-                .concatWith(Mono.just(toSse("done", finalConversationId)));
+                .doOnError(e -> log.error("流式对话异常: conversationId={}", finalConversationId, e))
+                // 6. 在流末尾追加一条 [DONE] 事件，携带 conversationId
+                .concatWith(Mono.just("[DONE]:" + finalConversationId));
     }
 
     private String toChatSse(String data) {
