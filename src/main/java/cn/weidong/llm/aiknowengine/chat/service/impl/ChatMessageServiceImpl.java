@@ -81,6 +81,16 @@ public class ChatMessageServiceImpl
     }
 
     @Override
+    public List<ChatMessage> getMessagesByConversationId(String conversationId) {
+        if (!StringUtils.hasText(conversationId)) {
+            return Collections.emptyList();
+        }
+        return list(new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getConversationId, conversationId)
+                .orderByAsc(ChatMessage::getCreatedAt));
+    }
+
+    @Override
     public List<ChatMessage> getRecentMessages(String conversationId, int limit) {
         if (!StringUtils.hasText(conversationId) || limit <= 0) {
             return Collections.emptyList();

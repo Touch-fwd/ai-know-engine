@@ -19,5 +19,7 @@ public interface ChatMessageService extends IService<ChatMessage> {
 
     boolean deleteMessagesByConversationId(String conversationId);
 
+    List<ChatMessage> getMessagesByConversationId(String conversationId);
+
     List<ChatMessage> getRecentMessages(String conversationId, int limit);
 }

@@ -10,8 +10,6 @@ import cn.weidong.llm.aiknowengine.chat.memory.DatabaseChatMemoryStore;
 import cn.weidong.llm.aiknowengine.chat.service.ChatApplicationService;
 import cn.weidong.llm.aiknowengine.chat.service.ChatConversationService;
 import cn.weidong.llm.aiknowengine.chat.service.ChatMessageService;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
@@ -189,36 +187,26 @@ public class ChatController {
 
     @GetMapping("/conversations")
     public List<ChatConversation> conversations(@RequestParam String userId) {
-        return chatConversationService.list(new LambdaQueryWrapper<ChatConversation>()
-                .eq(ChatConversation::getUserId, userId)
-                .orderByDesc(ChatConversation::getUpdatedAt));
+        return chatConversationService.getConversationsByUserId(userId);
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
     public List<ChatMessage> messages(@PathVariable String conversationId) {
-        getConversation(conversationId);
-        return chatMessageService.list(new LambdaQueryWrapper<ChatMessage>()
-                .eq(ChatMessage::getConversationId, conversationId)
-                .orderByAsc(ChatMessage::getCreatedAt));
+        ChatConversation conversation = chatConversationService.getByConversationId(conversationId);
+        if (conversation == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在: " + conversationId);
+        }
+        return chatMessageService.getMessagesByConversationId(conversationId);
     }
 
     @DeleteMapping("/conversations/{conversationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConversation(@PathVariable String conversationId) {
-        getConversation(conversationId);
-        chatMessageService.remove(new LambdaQueryWrapper<ChatMessage>()
-                .eq(ChatMessage::getConversationId, conversationId));
-        chatConversationService.remove(new LambdaQueryWrapper<ChatConversation>()
-                .eq(ChatConversation::getConversationId, conversationId));
-    }
-
-    private ChatConversation getConversation(String conversationId) {
-        ChatConversation conversation = chatConversationService.getOne(new LambdaQueryWrapper<ChatConversation>()
-                .eq(ChatConversation::getConversationId, conversationId)
-                .last("LIMIT 1"));
+        ChatConversation conversation = chatConversationService.getByConversationId(conversationId);
         if (conversation == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在: " + conversationId);
         }
-        return conversation;
+        chatMessageService.deleteMessagesByConversationId(conversationId);
+        chatConversationService.deleteByConversationId(conversationId);
     }
 }
