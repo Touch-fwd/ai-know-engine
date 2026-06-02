@@ -1,7 +1,6 @@
 package cn.weidong.llm.aiknowengine.document.service;
 
 import cn.weidong.llm.aiknowengine.document.config.MinerUProperties;
-import cn.weidong.llm.aiknowengine.document.config.VisionModelProperties;
 import cn.weidong.llm.aiknowengine.document.constant.DocumentStatus;
 import cn.weidong.llm.aiknowengine.document.entity.KnowledgeDocument;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,10 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.chat.ChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -48,12 +48,14 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
     private static final String TEXT_MARKDOWN = "text/markdown; charset=utf-8";
     private static final String SUCCESS_STATE = "done";
     private static final String FAILED_STATE = "failed";
+    private static final String IMAGE_DESCRIPTION_PROMPT = "请描述这张图片的内容，包括场景、对象、布局、颜色、文字信息，直接输出纯文本描述，不要多余说明。";
     private static final Pattern MARKDOWN_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)]\\(([^)]+)\\)");
 
     @Autowired
     private  MinerUProperties minerUProperties ;
     @Autowired
-    private  VisionModelProperties visionModelProperties;
+    @Qualifier("openAiChatModel")
+    private ChatModel chatModel;
     @Autowired
     private  KnowledgeDocumentService knowledgeDocumentService;
     @Autowired
@@ -456,34 +458,17 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
     }
 
     public String generateImageDescription(String imageUrl) {
-        if (!StringUtils.hasText(visionModelProperties.getApiKey()) || !StringUtils.hasText(visionModelProperties.getBaseUrl())) {
-            log.warn("Vision model config is incomplete, skip image description generation");
-            return null;
-        }
         try {
-            String baseUrl = visionModelProperties.normalizedBaseUrl();
-            log.info("Generating image description, modelName={}, baseUrl={}",
-                    visionModelProperties.getModelName(), baseUrl);
-            // 使用 OpenAI-compatible 协议调用视觉模型，具体供应商由配置中的 baseUrl 决定。
-            OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                    .apiKey(visionModelProperties.getApiKey())
-                    .baseUrl(baseUrl)
-                    .modelName(visionModelProperties.getModelName())
-                    .temperature(visionModelProperties.getTemperature())
-                    .logRequests(visionModelProperties.isLogRequests())
-                    .logResponses(visionModelProperties.isLogResponses())
-                    .build();
-
+            log.info("Generating image description with openAiChatModel");
             UserMessage userMessage = UserMessage.from(
-                    TextContent.from(visionModelProperties.getPrompt()),
+                    TextContent.from(IMAGE_DESCRIPTION_PROMPT),
                     ImageContent.from(imageUrl)
             );
             String text = chatModel.chat(userMessage).aiMessage().text();
             log.info("Vision model image description generated, textLength={}", text == null ? 0 : text.length());
             return text;
         } catch (Exception ex) {
-            log.warn("Failed to generate image description, modelName={}, baseUrl={}",
-                    visionModelProperties.getModelName(), visionModelProperties.normalizedBaseUrl(), ex);
+            log.warn("Failed to generate image description with openAiChatModel", ex);
             return null;
         }
     }

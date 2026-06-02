@@ -63,6 +63,15 @@ public class ChatController {
     @Value("${langchain4j.open-ai.chat-model.base-url}")
     private String chatModelBaseUrl;
 
+    @Value("${langchain4j.open-ai.title-chat-model.model-name}")
+    private String titleChatModelName;
+
+    @Value("${langchain4j.open-ai.title-chat-model.temperature}")
+    private Double titleChatModelTemperature;
+
+    @Value("${langchain4j.open-ai.title-chat-model.enable-thinking}")
+    private Boolean titleChatModelEnableThinking;
+
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final ChatConversationService chatConversationService;
@@ -126,10 +135,10 @@ public class ChatController {
                 try {
                     OpenAiChatModel titleChatModel = OpenAiChatModel.builder()
                             .apiKey(chatModelApiKey)
-                            .modelName("qwen3.5-flash")
-                            .temperature(0.7)
+                            .modelName(titleChatModelName)
+                            .temperature(titleChatModelTemperature)
                             .baseUrl(chatModelBaseUrl)
-                            .customParameters(Map.of("enable_thinking", false))
+                            .customParameters(Map.of("enable_thinking", titleChatModelEnableThinking))
                             .build();
                     TitleSummaryService titleSummaryService = AiServices.builder(TitleSummaryService.class)
                             .chatModel(titleChatModel)
