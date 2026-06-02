@@ -8,11 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -53,9 +53,16 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
 
     @Autowired
     private  MinerUProperties minerUProperties ;
-    @Autowired
-    @Qualifier("openAiChatModel")
-    private ChatModel chatModel;
+    @Value("${langchain4j.open-ai.vision-chat-model.api-key}")
+    private String visionChatModelApiKey;
+    @Value("${langchain4j.open-ai.vision-chat-model.model-name}")
+    private String visionChatModelName;
+    @Value("${langchain4j.open-ai.vision-chat-model.base-url}")
+    private String visionChatModelBaseUrl;
+    @Value("${langchain4j.open-ai.vision-chat-model.temperature}")
+    private Double visionChatModelTemperature;
+    @Value("${langchain4j.open-ai.vision-chat-model.enable-thinking}")
+    private Boolean visionChatModelEnableThinking;
     @Autowired
     private  KnowledgeDocumentService knowledgeDocumentService;
     @Autowired
@@ -459,16 +466,23 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
 
     public String generateImageDescription(String imageUrl) {
         try {
-            log.info("Generating image description with openAiChatModel");
+            log.info("Generating image description with visionChatModel, modelName={}", visionChatModelName);
             UserMessage userMessage = UserMessage.from(
                     TextContent.from(IMAGE_DESCRIPTION_PROMPT),
                     ImageContent.from(imageUrl)
             );
-            String text = chatModel.chat(userMessage).aiMessage().text();
+            OpenAiChatModel visionChatModel = OpenAiChatModel.builder()
+                    .apiKey(visionChatModelApiKey)
+                    .modelName(visionChatModelName)
+                    .temperature(visionChatModelTemperature)
+                    .baseUrl(visionChatModelBaseUrl)
+                    .customParameters(Map.of("enable_thinking", visionChatModelEnableThinking))
+                    .build();
+            String text = visionChatModel.chat(userMessage).aiMessage().text();
             log.info("Vision model image description generated, textLength={}", text == null ? 0 : text.length());
             return text;
         } catch (Exception ex) {
-            log.warn("Failed to generate image description with openAiChatModel", ex);
+            log.warn("Failed to generate image description with visionChatModel, modelName={}", visionChatModelName, ex);
             return null;
         }
     }
