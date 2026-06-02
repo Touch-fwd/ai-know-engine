@@ -13,6 +13,7 @@ import cn.weidong.llm.aiknowengine.document.param.DocumentSplitParam;
 import cn.weidong.llm.aiknowengine.document.service.*;
 import cn.weidong.llm.aiknowengine.document.util.FileTypeUtil;
 import cn.weidong.llm.aiknowengine.infra.lock.DistributeLock;
+import cn.weidong.llm.aiknowengine.infra.snowflake.SnowflakeIdGenerator;
 import cn.weidong.llm.aiknowengine.rag.constant.MetadataKeyConstant;
 import cn.weidong.llm.aiknowengine.rag.modules.splitter.DocumentSplitterFactory;
 import cn.weidong.llm.aiknowengine.rag.modules.splitter.ExcelSplitter;
@@ -101,8 +102,10 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
                 originalFilename, fileSize, uploadParam.uploadUser(), uploadParam.accessibleBy());
         try {
             // Step 1：先保存原始文件，确保后续转换失败时也能追溯原始上传内容。
-            String fileUrl = fileStorageService.uploadFile(uploadParam.file(), originalFilename);
-            log.info("Knowledge document file uploaded to storage, fileName={}, fileUrl={}", originalFilename, fileUrl);
+            String objectName = buildObjectNameWithSnowflakeId(originalFilename);
+            String fileUrl = fileStorageService.uploadFile(uploadParam.file(), objectName);
+            log.info("Knowledge document file uploaded to storage, fileName={}, objectName={}, fileUrl={}",
+                    originalFilename, objectName, fileUrl);
 
             // Step 2：创建文档主表记录，初始状态为 UPLOADED。
             KnowledgeDocument document = new KnowledgeDocument();
@@ -147,6 +150,19 @@ public class DocumentHandleServiceImpl implements DocumentHandleService {
             log.error("Knowledge document upload failed, fileName={}, uploadUser={}", originalFilename, uploadParam.uploadUser(), ex);
             throw new IllegalStateException("Knowledge document upload failed", ex);
         }
+    }
+
+    private String buildObjectNameWithSnowflakeId(String originalFilename) {
+        String snowflakeId = SnowflakeIdGenerator.getInstance().nextIdStr();
+        if (!StringUtils.hasText(originalFilename)) {
+            return "document-" + snowflakeId;
+        }
+        String filename = StringUtils.cleanPath(originalFilename);
+        int extensionIndex = filename.lastIndexOf('.');
+        if (extensionIndex > 0 && extensionIndex < filename.length() - 1) {
+            return filename.substring(0, extensionIndex) + "-" + snowflakeId + filename.substring(extensionIndex);
+        }
+        return filename + "-" + snowflakeId;
     }
 
     /**

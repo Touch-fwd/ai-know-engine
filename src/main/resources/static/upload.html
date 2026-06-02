@@ -192,7 +192,21 @@
             background: #fff;
         }
 
-        input[type="text"]:focus {
+        input[type="number"],
+        select {
+            width: 100%;
+            height: 42px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 12px;
+            font: inherit;
+            color: var(--text);
+            background: #fff;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
             outline: 2px solid rgba(40, 121, 91, 0.20);
             border-color: var(--accent);
         }
@@ -211,6 +225,44 @@
             justify-content: flex-end;
             gap: 12px;
             margin-top: 22px;
+        }
+
+        .progress {
+            display: none;
+            margin-top: 16px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .progress.is-visible {
+            display: grid;
+            gap: 8px;
+        }
+
+        .progress-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .progress-track {
+            height: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #e7ede9;
+        }
+
+        .progress-bar {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: var(--accent);
+            transition: width 0.2s ease;
         }
 
         button {
@@ -348,6 +400,60 @@
             font-size: 13px;
         }
 
+        .split-panel {
+            display: none;
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid var(--line);
+        }
+
+        .split-panel.is-visible {
+            display: grid;
+            gap: 14px;
+        }
+
+        .split-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .split-grid label:first-child {
+            grid-column: 1 / -1;
+        }
+
+        .split-extra {
+            display: none;
+        }
+
+        .split-extra.is-visible {
+            display: grid;
+        }
+
+        .split-result {
+            display: none;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .split-result.is-visible {
+            display: block;
+        }
+
+        .split-result.ok {
+            background: #e6f3eb;
+            color: var(--ok);
+            border: 1px solid #b8dfc5;
+        }
+
+        .split-result.error {
+            background: #fbe9e7;
+            color: var(--danger);
+            border: 1px solid #f3c4bd;
+        }
+
         @media (max-width: 860px) {
             .app {
                 width: min(100% - 24px, 640px);
@@ -396,6 +502,16 @@
                 <div id="selectedFile" class="selected-file" aria-live="polite">
                     <span id="fileName" class="file-name"></span>
                     <span id="fileSize" class="file-size"></span>
+                </div>
+
+                <div id="uploadProgress" class="progress" aria-live="polite">
+                    <div class="progress-meta">
+                        <span id="progressLabel">准备上传</span>
+                        <span id="progressValue">0%</span>
+                    </div>
+                    <div class="progress-track" aria-hidden="true">
+                        <div id="progressBar" class="progress-bar"></div>
+                    </div>
                 </div>
 
                 <div class="form-grid">
@@ -451,6 +567,38 @@
                         <dd id="resultStatus"></dd>
                     </div>
                 </dl>
+                <div id="splitPanel" class="split-panel">
+                    <div class="split-grid">
+                        <label>
+                            切分方式
+                            <select id="splitType">
+                                <option value="SMART">智能切分</option>
+                                <option value="TITLE">按标题</option>
+                                <option value="LENGTH">按长度</option>
+                                <option value="SEPARATOR">按分隔符</option>
+                                <option value="REGEX">按正则</option>
+                            </select>
+                        </label>
+                        <label>
+                            分片大小
+                            <input id="chunkSize" type="number" min="1" step="1" value="1000">
+                        </label>
+                        <label>
+                            重叠大小
+                            <input id="overlap" type="number" min="0" step="1" value="100">
+                        </label>
+                        <label id="separatorField" class="split-extra">
+                            分隔符
+                            <input id="separator" type="text" value="\n\n">
+                        </label>
+                        <label id="regexField" class="split-extra">
+                            正则表达式
+                            <input id="regex" type="text" value="\n\n+">
+                        </label>
+                    </div>
+                    <button id="splitButton" class="primary" type="button">切分文档</button>
+                    <div id="splitResult" class="split-result" role="status"></div>
+                </div>
             </div>
         </aside>
     </main>
@@ -471,6 +619,23 @@
     const statusPill = document.getElementById("statusPill");
     const emptyState = document.getElementById("emptyState");
     const resultDetails = document.getElementById("resultDetails");
+    const uploadProgress = document.getElementById("uploadProgress");
+    const progressLabel = document.getElementById("progressLabel");
+    const progressValue = document.getElementById("progressValue");
+    const progressBar = document.getElementById("progressBar");
+    const splitPanel = document.getElementById("splitPanel");
+    const splitType = document.getElementById("splitType");
+    const chunkSize = document.getElementById("chunkSize");
+    const overlap = document.getElementById("overlap");
+    const separator = document.getElementById("separator");
+    const regex = document.getElementById("regex");
+    const separatorField = document.getElementById("separatorField");
+    const regexField = document.getElementById("regexField");
+    const splitButton = document.getElementById("splitButton");
+    const splitResult = document.getElementById("splitResult");
+    let currentDocument = null;
+    let uploadProgressTimer = null;
+    let uploadProgressPercent = 0;
 
     dropZone.addEventListener("click", () => fileInput.click());
     dropZone.addEventListener("keydown", (event) => {
@@ -509,14 +674,22 @@
         }
     });
 
+    splitType.addEventListener("change", renderSplitFields);
+    renderSplitFields();
+
     resetButton.addEventListener("click", () => {
         uploadForm.reset();
         selectedFile.classList.remove("is-visible");
         fileName.textContent = "";
         fileSize.textContent = "";
+        currentDocument = null;
+        stopUploadProgress();
+        setUploadProgress(0, "准备上传", false);
         setStatus("等待上传");
         resultDetails.hidden = true;
         emptyState.hidden = false;
+        splitPanel.classList.remove("is-visible");
+        clearSplitResult();
         clearMessage();
     });
 
@@ -536,26 +709,58 @@
         submitButton.disabled = true;
         resetButton.disabled = true;
         setStatus("上传中");
+        currentDocument = null;
+        splitPanel.classList.remove("is-visible");
+        clearSplitResult();
         clearMessage();
+        startUploadProgress();
 
         try {
-            const response = await fetch("/api/knowledge-documents/upload", {
-                method: "POST",
-                body: formData
-            });
-            const responseText = await response.text();
-            const payload = responseText ? JSON.parse(responseText) : {};
-            if (!response.ok) {
-                throw new Error(payload.message || payload.error || "上传失败");
-            }
+            const payload = await uploadDocument(formData);
+            stopUploadProgress();
+            setUploadProgress(100, "上传完成", true);
             renderResult(payload);
             setStatus("上传成功", "ok");
         } catch (error) {
+            stopUploadProgress();
             setStatus("上传失败", "error");
+            setUploadProgress(0, "上传失败", true);
             showMessage(error.message || "上传失败，请检查服务端日志。", "error");
         } finally {
             submitButton.disabled = false;
             resetButton.disabled = false;
+        }
+    });
+
+    splitButton.addEventListener("click", async () => {
+        if (!currentDocument || !currentDocument.docId) {
+            showSplitResult("请先上传文档。", "error");
+            return;
+        }
+        splitButton.disabled = true;
+        showSplitResult("文档切分中，请稍候...", "ok");
+        try {
+            const response = await fetch(`/api/knowledge-documents/${currentDocument.docId}/split`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(buildSplitParam())
+            });
+            const responseText = await response.text();
+            const payload = responseText ? JSON.parse(responseText) : {};
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || "文档切分失败");
+            }
+            currentDocument.status = "CHUNKED";
+            setText("resultStatus", currentDocument.status);
+            setStatus("切分完成", "ok");
+            showSplitResult(`切分完成，生成 ${payload.segmentCount || 0} 个片段。`, "ok");
+        } catch (error) {
+            setStatus("切分失败", "error");
+            showSplitResult(error.message || "文档切分失败，请检查服务端日志。", "error");
+        } finally {
+            splitButton.disabled = currentDocument && currentDocument.status !== "CONVERTED";
         }
     });
 
@@ -566,6 +771,7 @@
     }
 
     function renderResult(uploadedDocument) {
+        currentDocument = uploadedDocument;
         emptyState.hidden = true;
         resultDetails.hidden = false;
         setText("docId", uploadedDocument.docId);
@@ -574,6 +780,111 @@
         setText("resultUploadUser", uploadedDocument.uploadUser);
         setText("resultAccessibleBy", uploadedDocument.accessibleBy);
         setText("resultStatus", uploadedDocument.status);
+        splitPanel.classList.add("is-visible");
+        splitButton.disabled = uploadedDocument.status !== "CONVERTED";
+        if (uploadedDocument.status !== "CONVERTED") {
+            showSplitResult(`当前文档状态为 ${uploadedDocument.status || "-"}，接口仅支持 CONVERTED 状态切分。`, "error");
+        } else {
+            clearSplitResult();
+        }
+    }
+
+    function uploadDocument(formData) {
+        return new Promise((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            request.open("POST", "/api/knowledge-documents/upload");
+            request.upload.addEventListener("progress", (event) => {
+                if (!event.lengthComputable) {
+                    return;
+                }
+                const percent = Math.max(uploadProgressPercent, Math.min(90, Math.round((event.loaded / event.total) * 90)));
+                setUploadProgress(percent, "上传中", true);
+            });
+            request.addEventListener("load", () => {
+                const responseText = request.responseText || "";
+                let payload = {};
+                if (responseText) {
+                    try {
+                        payload = JSON.parse(responseText);
+                    } catch (error) {
+                        reject(new Error("服务端返回内容无法解析"));
+                        return;
+                    }
+                }
+                if (request.status < 200 || request.status >= 300) {
+                    reject(new Error(payload.message || payload.error || "上传失败"));
+                    return;
+                }
+                resolve(payload);
+            });
+            request.addEventListener("error", () => reject(new Error("上传请求失败")));
+            request.addEventListener("abort", () => reject(new Error("上传已取消")));
+            request.send(formData);
+        });
+    }
+
+    function startUploadProgress() {
+        setUploadProgress(8, "准备上传", true);
+        stopUploadProgress();
+        uploadProgressTimer = window.setInterval(() => {
+            const nextPercent = Math.min(88, uploadProgressPercent + Math.max(1, Math.round((90 - uploadProgressPercent) * 0.08)));
+            setUploadProgress(nextPercent, nextPercent < 40 ? "上传中" : "服务端处理中", true);
+        }, 420);
+    }
+
+    function stopUploadProgress() {
+        if (uploadProgressTimer) {
+            window.clearInterval(uploadProgressTimer);
+            uploadProgressTimer = null;
+        }
+    }
+
+    function setUploadProgress(percent, label, visible) {
+        uploadProgressPercent = percent;
+        uploadProgress.classList.toggle("is-visible", visible);
+        progressLabel.textContent = label;
+        progressValue.textContent = `${percent}%`;
+        progressBar.style.width = `${percent}%`;
+    }
+
+    function buildSplitParam() {
+        const param = {
+            splitType: splitType.value,
+            chunkSize: toPositiveInteger(chunkSize.value),
+            overlap: toNonNegativeInteger(overlap.value)
+        };
+        if (splitType.value === "SEPARATOR") {
+            param.separator = separator.value || "\\n\\n";
+        }
+        if (splitType.value === "REGEX") {
+            param.regex = regex.value || "\\n\\n+";
+        }
+        return param;
+    }
+
+    function renderSplitFields() {
+        separatorField.classList.toggle("is-visible", splitType.value === "SEPARATOR");
+        regexField.classList.toggle("is-visible", splitType.value === "REGEX");
+    }
+
+    function toPositiveInteger(value) {
+        const number = Number.parseInt(value, 10);
+        return Number.isFinite(number) && number > 0 ? number : null;
+    }
+
+    function toNonNegativeInteger(value) {
+        const number = Number.parseInt(value, 10);
+        return Number.isFinite(number) && number >= 0 ? number : null;
+    }
+
+    function showSplitResult(text, type) {
+        splitResult.textContent = text;
+        splitResult.className = `split-result ${type} is-visible`;
+    }
+
+    function clearSplitResult() {
+        splitResult.textContent = "";
+        splitResult.className = "split-result";
     }
 
     function setText(id, value) {

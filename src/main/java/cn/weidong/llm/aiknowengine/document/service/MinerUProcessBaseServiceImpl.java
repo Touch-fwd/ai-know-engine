@@ -361,7 +361,7 @@ public abstract class MinerUProcessBaseServiceImpl implements FileProcessService
             String processedMarkdown = processMarkdownImages(document, markdownPath, markdown);
             Files.writeString(markdownPath, processedMarkdown, StandardCharsets.UTF_8);
 
-            String mdObjectName = "converted/" + document.getDocId() + "/" + stripExtension(markdownPath.getFileName().toString()) + "-"
+            String mdObjectName = "converted/" + document.getDocTitle() + "-"
                     + UUID.randomUUID() + ".md";
             String mdUrl = fileStorageService.uploadFile(mdObjectName,
                     processedMarkdown.getBytes(StandardCharsets.UTF_8),
