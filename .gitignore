@@ -4,4 +4,4 @@ target/
 .idea/
 *.log
 .DS_Store
-/src/main/resources/model.bge-reranker-model/
+/src/main/resources/model/bge-reranker-model/

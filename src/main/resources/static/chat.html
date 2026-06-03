@@ -236,6 +236,70 @@
             background: var(--assistant);
         }
 
+        .progress-log {
+            align-self: flex-start;
+            max-width: min(760px, 86%);
+            border: 1px solid #f0c5c1;
+            border-radius: 8px;
+            background: #fffafa;
+            padding: 10px 12px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--danger);
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+
+        .progress-item.is-complete {
+            color: #25834c;
+        }
+
+        .progress-status {
+            width: 18px;
+            flex: 0 0 18px;
+            text-align: center;
+        }
+
+        .progress-text {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .progress-loading {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--danger);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .progress-spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f0c5c1;
+            border-top-color: var(--danger);
+            border-radius: 50%;
+            animation: progress-spin 0.8s linear infinite;
+        }
+
+        .progress-item.is-complete .progress-loading {
+            display: none;
+        }
+
+        @keyframes progress-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .composer {
             display: grid;
             grid-template-columns: minmax(0, 1fr) 96px;
@@ -360,7 +424,15 @@
         await loadConversations();
     });
 
-    document.querySelector('#composer').addEventListener('submit', async (event) => {
+    const composer = document.querySelector('#composer');
+
+    contentInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+        event.preventDefault();
+        composer.requestSubmit();
+    });
+
+    composer.addEventListener('submit', async (event) => {
         event.preventDefault();
         const userId = userIdInput.value.trim();
         const content = contentInput.value.trim();
@@ -371,8 +443,10 @@
         setStreaming(true);
         removeEmpty();
         appendMessage('user', content);
-        const assistantNode = appendMessage('assistant', '');
-        let showingProgress = false;
+        let progressNode = null;
+        let activeProgressItem = null;
+        let assistantNode = null;
+        let conversationLoaded = false;
 
         try {
             const response = await fetch(`${api}/stream`, {
@@ -387,6 +461,48 @@
             if (!response.ok || !response.body) {
                 throw new Error(await response.text());
             }
+            const handleProgress = (data) => {
+                if (!progressNode) {
+                    progressNode = appendProgressLog();
+                }
+                completeProgressItem(activeProgressItem);
+                activeProgressItem = appendProgressItem(progressNode, data);
+                messages.scrollTop = messages.scrollHeight;
+            };
+            const handleDelta = (data) => {
+                completeProgressItem(activeProgressItem);
+                activeProgressItem = null;
+                if (!assistantNode) {
+                    assistantNode = appendMessage('assistant', '');
+                }
+                assistantNode.textContent += data;
+                messages.scrollTop = messages.scrollHeight;
+            };
+            const handleDone = async (conversationId) => {
+                completeProgressItem(activeProgressItem);
+                activeProgressItem = null;
+                if (conversationId) {
+                    state.conversationId = conversationId;
+                    deleteButton.disabled = false;
+                    chatMeta.textContent = conversationId;
+                }
+                if (!conversationLoaded) {
+                    conversationLoaded = true;
+                    await loadConversations();
+                    markActiveConversation();
+                }
+            };
+            const handleMessage = async (data) => {
+                if (data.startsWith('[PROGRESS]:')) {
+                    handleProgress(data.slice('[PROGRESS]:'.length));
+                    return;
+                }
+                if (data.startsWith('[DONE]:')) {
+                    await handleDone(data.slice('[DONE]:'.length));
+                    return;
+                }
+                handleDelta(data);
+            };
             await readSse(response.body, {
                 conversation: (data) => {
                     const meta = JSON.parse(data);
@@ -394,25 +510,16 @@
                     deleteButton.disabled = false;
                     chatMeta.textContent = meta.conversationId;
                 },
-                progress: (data) => {
-                    assistantNode.textContent = data;
-                    showingProgress = true;
-                    messages.scrollTop = messages.scrollHeight;
-                },
-                delta: (data) => {
-                    if (showingProgress) {
-                        assistantNode.textContent = '';
-                        showingProgress = false;
-                    }
-                    assistantNode.textContent += data;
-                    messages.scrollTop = messages.scrollHeight;
-                },
-                done: async () => {
-                    await loadConversations();
-                    markActiveConversation();
-                }
+                progress: handleProgress,
+                delta: handleDelta,
+                done: handleDone,
+                message: handleMessage
             });
         } catch (error) {
+            completeProgressItem(activeProgressItem);
+            if (!assistantNode) {
+                assistantNode = appendMessage('assistant', '');
+            }
             assistantNode.textContent = `请求失败：${error.message || error}`;
         } finally {
             setStreaming(false);
@@ -472,6 +579,39 @@
         return node;
     }
 
+    function appendProgressLog() {
+        removeEmpty();
+        const node = document.createElement('div');
+        node.className = 'progress-log';
+        messages.appendChild(node);
+        messages.scrollTop = messages.scrollHeight;
+        return node;
+    }
+
+    function appendProgressItem(progressNode, text) {
+        const node = document.createElement('div');
+        node.className = 'progress-item is-active';
+        node.innerHTML = `
+            <span class="progress-status" aria-hidden="true"></span>
+            <span class="progress-text"></span>
+            <span class="progress-loading">
+                <span class="progress-spinner" aria-hidden="true"></span>
+                <span>处理中</span>
+            </span>
+        `;
+        node.querySelector('.progress-text').textContent = text;
+        progressNode.appendChild(node);
+        messages.scrollTop = messages.scrollHeight;
+        return node;
+    }
+
+    function completeProgressItem(node) {
+        if (!node || node.classList.contains('is-complete')) return;
+        node.classList.remove('is-active');
+        node.classList.add('is-complete');
+        node.querySelector('.progress-status').textContent = '✅';
+    }
+
     function removeEmpty() {
         const empty = messages.querySelector('.empty');
         if (empty) empty.remove();
@@ -485,24 +625,25 @@
             const {value, done} = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, {stream: true});
-            const events = buffer.split('\n\n');
-            buffer = events.pop() || '';
-            for (const rawEvent of events) {
-                dispatchSse(rawEvent, handlers);
+            const parts = buffer.split(/\r?\n\r?\n/);
+            buffer = parts.pop() || '';
+            for (const rawEvent of parts) {
+                await dispatchSse(rawEvent, handlers);
             }
         }
-        if (buffer) dispatchSse(buffer, handlers);
+        buffer += decoder.decode();
+        if (buffer) await dispatchSse(buffer, handlers);
     }
 
-    function dispatchSse(rawEvent, handlers) {
-        const lines = rawEvent.split('\n');
+    async function dispatchSse(rawEvent, handlers) {
+        const lines = rawEvent.split(/\r?\n/);
         let event = 'message';
         const data = [];
         for (const line of lines) {
             if (line.startsWith('event:')) event = line.slice(6).trim();
             if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
         }
-        if (handlers[event]) handlers[event](data.join('\n'));
+        if (handlers[event]) await handlers[event](data.join('\n'));
     }
 
     function markActiveConversation() {
