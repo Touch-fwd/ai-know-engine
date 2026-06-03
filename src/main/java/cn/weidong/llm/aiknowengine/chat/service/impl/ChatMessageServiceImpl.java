@@ -62,13 +62,11 @@ public class ChatMessageServiceImpl
     }
 
     @Override
-    public boolean updateRagReferences(String messageId, List<ChatMessage.RagReference> ragReferenceChunks) {
-        if (!StringUtils.hasText(messageId)) {
-            return false;
-        }
-        return update(new LambdaUpdateWrapper<ChatMessage>()
-                .eq(ChatMessage::getMessageId, messageId)
-                .set(ChatMessage::getRagReferences, ragReferenceChunks));
+    public boolean updateRagReferences(String messageId, List<ChatMessage.RagReference> ragReferences) {
+        ChatMessage update = new ChatMessage();
+        update.setRagReferences(ragReferences);
+        return this.update(update, new LambdaQueryWrapper<ChatMessage>()
+                .eq(ChatMessage::getMessageId, messageId));
     }
 
     @Override

@@ -220,8 +220,11 @@
             border-radius: 8px;
             padding: 12px 14px;
             line-height: 1.65;
-            white-space: pre-wrap;
             overflow-wrap: anywhere;
+        }
+
+        .message-content {
+            white-space: pre-wrap;
         }
 
         .message.user {
@@ -234,6 +237,53 @@
         .message.assistant {
             align-self: flex-start;
             background: var(--assistant);
+        }
+
+        .reference-box {
+            margin-top: 12px;
+            border-top: 1px solid var(--line);
+            padding-top: 10px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .reference-title {
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .reference-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .reference-item {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fbfcfd;
+            padding: 8px 10px;
+            display: grid;
+            gap: 4px;
+        }
+
+        .reference-link {
+            color: var(--accent);
+            font-weight: 700;
+            text-decoration: none;
+            overflow-wrap: anywhere;
+        }
+
+        .reference-link:hover {
+            text-decoration: underline;
+        }
+
+        .reference-meta {
+            color: var(--muted);
+            font-size: 12px;
         }
 
         .progress-log {
@@ -475,7 +525,7 @@
                 if (!assistantNode) {
                     assistantNode = appendMessage('assistant', '');
                 }
-                assistantNode.textContent += data;
+                assistantNode = appendAssistantStreamData(assistantNode, data);
                 messages.scrollTop = messages.scrollHeight;
             };
             const handleDone = async (conversationId) => {
@@ -520,7 +570,7 @@
             if (!assistantNode) {
                 assistantNode = appendMessage('assistant', '');
             }
-            assistantNode.textContent = `请求失败：${error.message || error}`;
+            setMessageContent(assistantNode, `请求失败：${error.message || error}`);
         } finally {
             setStreaming(false);
         }
@@ -565,18 +615,162 @@
             return;
         }
         for (const item of records) {
-            appendMessage(item.type === 'USER' ? 'user' : 'assistant', item.content || '');
+            appendMessage(
+                item.type === 'USER' ? 'user' : 'assistant',
+                item.content || '',
+                item.ragReferences || []
+            );
         }
     }
 
-    function appendMessage(type, text) {
+    function appendMessage(type, text, references = []) {
         removeEmpty();
         const node = document.createElement('div');
         node.className = `message ${type}`;
-        node.textContent = text;
+        const contentNode = document.createElement('div');
+        contentNode.className = 'message-content';
+        contentNode.textContent = text;
+        node.appendChild(contentNode);
+        if (type === 'assistant') {
+            renderReferences(node, references);
+        }
         messages.appendChild(node);
         messages.scrollTop = messages.scrollHeight;
         return node;
+    }
+
+    function getMessageContentNode(messageNode) {
+        return messageNode.querySelector('.message-content') || messageNode;
+    }
+
+    function setMessageContent(messageNode, text) {
+        getMessageContentNode(messageNode).textContent = text;
+    }
+
+    function appendMessageContent(messageNode, text) {
+        getMessageContentNode(messageNode).textContent += text;
+    }
+
+    function appendAssistantStreamData(messageNode, data) {
+        let rest = data;
+        while (rest) {
+            const markerIndex = rest.indexOf('[REFERENCE]:');
+            if (markerIndex < 0) {
+                appendMessageContent(messageNode, rest);
+                break;
+            }
+
+            if (markerIndex > 0) {
+                appendMessageContent(messageNode, rest.slice(0, markerIndex));
+            }
+
+            const parsed = parseReferencePayload(rest.slice(markerIndex + '[REFERENCE]:'.length));
+            if (!parsed) {
+                appendMessageContent(messageNode, rest.slice(markerIndex));
+                break;
+            }
+
+            addReferences(messageNode, parsed.references);
+            rest = parsed.rest;
+        }
+        return messageNode;
+    }
+
+    function parseReferencePayload(text) {
+        const start = text.search(/[\[{]/);
+        if (start < 0) return null;
+
+        const open = text[start];
+        const close = open === '[' ? ']' : '}';
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+
+        for (let i = start; i < text.length; i++) {
+            const char = text[i];
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (char === '\\') {
+                escaped = inString;
+                continue;
+            }
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+            if (char === open) depth += 1;
+            if (char === close) depth -= 1;
+            if (depth === 0) {
+                const jsonText = text.slice(start, i + 1);
+                try {
+                    const value = JSON.parse(jsonText);
+                    return {
+                        references: Array.isArray(value) ? value : [value],
+                        rest: text.slice(i + 1)
+                    };
+                } catch (error) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    function addReferences(messageNode, references) {
+        const current = messageNode._references || [];
+        messageNode._references = current.concat(references || []);
+        renderReferences(messageNode, messageNode._references);
+    }
+
+    function renderReferences(messageNode, references) {
+        const oldBox = messageNode.querySelector('.reference-box');
+        if (oldBox) oldBox.remove();
+        if (!references || !references.length) return;
+
+        const box = document.createElement('div');
+        box.className = 'reference-box';
+
+        const title = document.createElement('div');
+        title.className = 'reference-title';
+        title.textContent = '参考资料';
+        box.appendChild(title);
+
+        const list = document.createElement('ul');
+        list.className = 'reference-list';
+        references.forEach((reference, index) => {
+            const item = document.createElement('li');
+            item.className = 'reference-item';
+
+            const link = document.createElement('a');
+            link.className = 'reference-link';
+            link.href = reference.url || '#';
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = reference.documentTitle || `参考文档 ${index + 1}`;
+            item.appendChild(link);
+
+            const meta = document.createElement('div');
+            meta.className = 'reference-meta';
+            const details = [];
+            if (reference.retrievalSource) details.push(reference.retrievalSource);
+            if (reference.rerankScore != null) details.push(`rerank ${formatScore(reference.rerankScore)}`);
+            if (reference.similarityScore != null) details.push(`score ${formatScore(reference.similarityScore)}`);
+            if (reference.chunkId) details.push(`片段 ${reference.chunkId}`);
+            meta.textContent = details.join(' · ');
+            if (meta.textContent) item.appendChild(meta);
+
+            list.appendChild(item);
+        });
+        box.appendChild(list);
+        messageNode.appendChild(box);
+    }
+
+    function formatScore(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? number.toFixed(3) : value;
     }
 
     function appendProgressLog() {
